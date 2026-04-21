@@ -47,16 +47,24 @@ const legendContainer = document.querySelector("#legend");
 const activeScenarioChip = document.querySelector("#active-scenario-chip");
 const datasetSummary = document.querySelector("#dataset-summary");
 const resetViewButton = document.querySelector("#reset-view-button");
+const panelToggleButton = document.querySelector("#panel-toggle-button");
+const controlPanel = document.querySelector("#control-panel");
 const searchSection = document.querySelector("#search-section");
 const searchInput = document.querySelector("#search-input");
 const searchButton = document.querySelector("#search-button");
 const searchStatus = document.querySelector("#search-status");
+const overlayVisibleInput = document.querySelector("#overlay-visible-input");
+const overlayOpacityInput = document.querySelector("#overlay-opacity-input");
+const overlayOpacityValue = document.querySelector("#overlay-opacity-value");
 
 let datasetState = null;
 let glacierLayer = null;
 let selectedLayer = null;
 let selectedFeatureId = null;
 let defaultBounds = null;
+let overlayVisible = true;
+let overlayOpacity = Number(overlayOpacityInput.value) / 100;
+const DEFAULT_SCENARIO_CODE = "27";
 
 function setStatus(message, tone = "default") {
   statusBox.textContent = message;
@@ -143,8 +151,8 @@ function styleFeature(feature) {
     color: isSelected ? YEAR_STYLE.selected : YEAR_STYLE.outline,
     weight: isSelected ? 2.4 : 1.1,
     fillColor: classification.color,
-    fillOpacity: isSelected ? 0.78 : 0.62,
-    opacity: isSelected ? 1 : 0.85,
+    fillOpacity: (isSelected ? 0.88 : 0.7) * overlayOpacity,
+    opacity: (isSelected ? 1 : 0.9) * Math.max(overlayOpacity, 0.35),
   };
 }
 
@@ -152,21 +160,20 @@ function applyHoverStyle(layer) {
   layer.setStyle({
     weight: 2.8,
     color: YEAR_STYLE.hover,
-    fillOpacity: 0.88,
+    fillOpacity: 0.95 * overlayOpacity,
   });
   layer.bringToFront();
 }
 
 function restoreLayerStyle(layer) {
-  const feature = layer.feature;
-  layer.setStyle(styleFeature(feature));
+  layer.setStyle(styleFeature(layer.feature));
 }
 
 function buildScenarioTable(feature, activeScenario) {
   const rows = datasetState.scenarios
     .map((scenario) => {
       const values = Object.entries(scenario.fields)
-        .map(([statName, fieldName]) => {
+        .map(([statName]) => {
           const normalized = feature.properties.__scenarioValues[`${scenario.key}:${statName}`];
           const value = normalized?.label ?? "—";
           const label = statName === "median" ? "Median" : statName;
@@ -211,9 +218,12 @@ function buildMetadataTable(feature) {
   }
 
   return `
-    <table class="popup-table metadata-table">
-      <tbody>${rows}</tbody>
-    </table>
+    <details class="popup-details">
+      <summary>Metadata</summary>
+      <table class="popup-table metadata-table">
+        <tbody>${rows}</tbody>
+      </table>
+    </details>
   `;
 }
 
@@ -243,6 +253,7 @@ function buildTooltipContent(feature) {
   const activeScenario = getCurrentScenario();
   const title = feature.properties.Name || feature.properties.RGIId || feature.properties.GLIMSId || "Glacier";
   const value = feature.properties.__scenarioValues[activeScenario.key];
+
   return `<strong>${escapeHtml(title)}</strong><br>${escapeHtml(activeScenario.label)}: ${escapeHtml(
     value?.label ?? "Missing"
   )}`;
@@ -305,22 +316,20 @@ function updateDatasetSummary() {
   const summaryEntries = [
     ["Features", datasetState.featureCollection.features.length.toLocaleString()],
     ["Geometry column", datasetState.geometryField],
-    [
-      "Scenario fields",
-      datasetState.scenarios.map((scenario) => scenario.styleField).join(", "),
-    ],
+    ["Scenario fields", datasetState.scenarios.map((scenario) => scenario.styleField).join(", ")],
     ["Primary ID field", datasetState.primaryIdField ?? "None detected"],
   ];
 
   datasetSummary.innerHTML = summaryEntries
-    .map(
-      ([term, value]) =>
-        `<dt>${escapeHtml(term)}</dt><dd>${escapeHtml(value)}</dd>`
-    )
+    .map(([term, value]) => `<dt>${escapeHtml(term)}</dt><dd>${escapeHtml(value)}</dd>`)
     .join("");
 }
 
 function updateLayerStyles() {
+  if (!glacierLayer) {
+    return;
+  }
+
   glacierLayer.eachLayer((layer) => {
     restoreLayerStyle(layer);
     layer.setTooltipContent(buildTooltipContent(layer.feature));
@@ -328,6 +337,25 @@ function updateLayerStyles() {
       layer.setPopupContent(buildPopupContent(layer.feature));
     }
   });
+}
+
+function updateOverlayState() {
+  overlayOpacityValue.textContent = `${Math.round(overlayOpacity * 100)}%`;
+
+  if (!glacierLayer) {
+    return;
+  }
+
+  if (overlayVisible) {
+    if (!map.hasLayer(glacierLayer)) {
+      glacierLayer.addTo(map);
+    }
+    updateLayerStyles();
+  } else if (map.hasLayer(glacierLayer)) {
+    map.removeLayer(glacierLayer);
+    selectedLayer = null;
+    selectedFeatureId = null;
+  }
 }
 
 function zoomToFeature(feature) {
@@ -383,13 +411,13 @@ function initializeSearch() {
       return;
     }
 
-    const feature = datasetState.featureCollection.features.find((candidate) => {
-      return datasetState.searchFields.some((field) =>
+    const feature = datasetState.featureCollection.features.find((candidate) =>
+      datasetState.searchFields.some((field) =>
         String(candidate.properties[field] ?? "")
           .toLowerCase()
           .includes(query)
-      );
-    });
+      )
+    );
 
     if (!feature) {
       searchStatus.textContent = `No glacier matched "${query}".`;
@@ -405,6 +433,14 @@ function initializeSearch() {
     if (event.key === "Enter") {
       runSearch();
     }
+  });
+}
+
+function initializePanelToggle() {
+  panelToggleButton.addEventListener("click", () => {
+    const collapsed = controlPanel.classList.toggle("is-collapsed");
+    panelToggleButton.textContent = collapsed ? "Expand" : "Collapse";
+    panelToggleButton.setAttribute("aria-expanded", String(!collapsed));
   });
 }
 
@@ -425,13 +461,16 @@ async function bootstrap() {
     scenarioSelect.append(option);
   });
 
-  scenarioSelect.value = datasetState.scenarios[0].key;
+  scenarioSelect.value =
+    datasetState.scenarios.find((scenario) => scenario.code === DEFAULT_SCENARIO_CODE)?.key ??
+    datasetState.scenarios[0].key;
 
   glacierLayer = L.geoJSON(datasetState.featureCollection, {
     style: styleFeature,
     onEachFeature(feature, layer) {
       layer.bindPopup(buildPopupContent(feature), {
-        maxWidth: 420,
+        maxWidth: 360,
+        minWidth: 260,
       });
       wireLayerInteractions(layer);
     },
@@ -450,16 +489,28 @@ async function bootstrap() {
     updateLayerStyles();
   });
 
+  overlayVisibleInput.addEventListener("change", () => {
+    overlayVisible = overlayVisibleInput.checked;
+    updateOverlayState();
+  });
+
+  overlayOpacityInput.addEventListener("input", () => {
+    overlayOpacity = Number(overlayOpacityInput.value) / 100;
+    updateOverlayState();
+  });
+
   resetViewButton.addEventListener("click", () => {
     if (defaultBounds?.isValid()) {
       map.fitBounds(defaultBounds, { padding: [24, 24] });
     }
   });
 
+  initializePanelToggle();
   updateLegend();
   updateScenarioStats();
   updateDatasetSummary();
   initializeSearch();
+  updateOverlayState();
   setStatus("Loaded Swiss glacier geometries.", "success");
 }
 

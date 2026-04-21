@@ -1,13 +1,15 @@
 :root {
   color-scheme: light;
-  --bg: #ecf4f8;
-  --panel: rgba(255, 255, 255, 0.95);
-  --panel-border: rgba(39, 72, 92, 0.12);
-  --text: #0f172a;
-  --muted: #516173;
-  --accent: #0c7288;
-  --accent-soft: #dff0f5;
-  --shadow: 0 18px 40px rgba(14, 36, 54, 0.16);
+  --bg: #08111d;
+  --panel: rgba(9, 20, 34, 0.9);
+  --panel-strong: rgba(7, 15, 27, 0.96);
+  --panel-border: rgba(91, 140, 182, 0.22);
+  --text: #eff6ff;
+  --muted: #aac0d5;
+  --accent: #4db0ff;
+  --accent-strong: #1e88e5;
+  --accent-soft: rgba(77, 176, 255, 0.14);
+  --shadow: 0 18px 40px rgba(1, 8, 16, 0.4);
   --radius: 18px;
   --font-body: "Segoe UI", "Aptos", "Helvetica Neue", sans-serif;
   --font-display: "Georgia", "Times New Roman", serif;
@@ -29,8 +31,8 @@ body {
   font-family: var(--font-body);
   color: var(--text);
   background:
-    radial-gradient(circle at top left, rgba(12, 114, 136, 0.18), transparent 30%),
-    radial-gradient(circle at bottom right, rgba(133, 197, 225, 0.22), transparent 25%),
+    radial-gradient(circle at top left, rgba(30, 136, 229, 0.22), transparent 30%),
+    radial-gradient(circle at bottom right, rgba(77, 176, 255, 0.16), transparent 25%),
     var(--bg);
 }
 
@@ -55,44 +57,74 @@ body {
 .app-header {
   top: 18px;
   left: 18px;
-  right: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 14px 18px;
+  width: min(520px, calc(100vw - 96px));
+  padding: 12px 16px;
   border-radius: var(--radius);
+}
+
+.header-copy {
+  max-width: 100%;
 }
 
 .app-header h1 {
   margin: 0;
   font-family: var(--font-display);
-  font-size: clamp(1.25rem, 2vw, 1.9rem);
+  font-size: clamp(1.15rem, 1.7vw, 1.75rem);
   font-weight: 600;
+  line-height: 1.05;
 }
 
 .eyebrow {
   margin: 0 0 4px;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   text-transform: uppercase;
   letter-spacing: 0.12em;
   color: var(--accent);
 }
 
 .control-panel {
-  top: 102px;
+  top: 94px;
   left: 18px;
   width: min(360px, calc(100vw - 36px));
   max-height: calc(100vh - 120px);
   overflow: auto;
-  padding: 18px;
+  padding: 14px;
   border-radius: var(--radius);
+  transition: width 180ms ease;
+}
+
+.control-panel.is-collapsed {
+  width: 188px;
+}
+
+.control-panel-body {
+  display: block;
+}
+
+.control-panel.is-collapsed .control-panel-body {
+  display: none;
+}
+
+.panel-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.panel-title {
+  margin: 0;
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 8px;
 }
 
 .control-panel section + section {
   margin-top: 18px;
   padding-top: 18px;
-  border-top: 1px solid rgba(39, 72, 92, 0.1);
+  border-top: 1px solid rgba(91, 140, 182, 0.16);
 }
 
 .control-panel h2 {
@@ -129,15 +161,20 @@ input {
   width: 100%;
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid rgba(39, 72, 92, 0.18);
-  background: #fff;
+  border: 1px solid rgba(108, 145, 182, 0.22);
+  background: rgba(6, 15, 27, 0.92);
+  color: var(--text);
+}
+
+input::placeholder {
+  color: #88a2b8;
 }
 
 button {
   border: 0;
   border-radius: 12px;
   padding: 10px 14px;
-  background: var(--accent);
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
   color: #fff;
   cursor: pointer;
   transition:
@@ -152,8 +189,14 @@ button:hover {
 }
 
 .ghost-button {
-  background: #eff6f8;
+  background: rgba(255, 255, 255, 0.08);
   color: var(--text);
+  border: 1px solid rgba(108, 145, 182, 0.18);
+}
+
+.compact-button {
+  padding: 8px 12px;
+  font-size: 0.9rem;
 }
 
 .search-row {
@@ -180,6 +223,32 @@ button:hover {
   font-weight: 700;
 }
 
+.inline-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.inline-toggle input {
+  width: auto;
+  margin: 0;
+}
+
+.range-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+output {
+  color: var(--accent);
+  font-weight: 700;
+  min-width: 44px;
+  text-align: right;
+}
+
 .legend {
   display: grid;
   gap: 8px;
@@ -200,7 +269,7 @@ button:hover {
   width: 18px;
   height: 18px;
   border-radius: 5px;
-  border: 1px solid rgba(15, 23, 42, 0.18);
+  border: 1px solid rgba(189, 215, 238, 0.24);
   flex: 0 0 auto;
 }
 
@@ -224,61 +293,93 @@ button:hover {
 .status-box {
   padding: 12px 14px;
   border-radius: 14px;
-  background: #eff6f8;
+  background: rgba(255, 255, 255, 0.06);
   color: var(--muted);
 }
 
 .status-box[data-tone="success"] {
-  background: #edf7f1;
-  color: #1f6a43;
+  background: rgba(40, 167, 69, 0.18);
+  color: #9ce7b0;
 }
 
 .status-box[data-tone="error"] {
-  background: #fef0f0;
-  color: #9b2226;
+  background: rgba(185, 28, 28, 0.18);
+  color: #ffb4b4;
+}
+
+.leaflet-control-layers,
+.leaflet-bar {
+  box-shadow: 0 12px 24px rgba(2, 10, 20, 0.3);
+}
+
+.leaflet-control-layers-expanded,
+.leaflet-control-layers-toggle,
+.leaflet-touch .leaflet-bar a {
+  background-color: rgba(10, 21, 37, 0.88);
+  color: var(--text);
+}
+
+.leaflet-control-layers-expanded {
+  border: 1px solid rgba(91, 140, 182, 0.22);
+}
+
+.leaflet-control-layers label {
+  color: var(--text);
 }
 
 .leaflet-popup-content-wrapper {
   border-radius: 16px;
+  background: var(--panel-strong);
+  color: var(--text);
+}
+
+.leaflet-popup-tip {
+  background: var(--panel-strong);
 }
 
 .leaflet-popup-content {
-  margin: 14px 16px;
-  width: min(380px, 75vw);
+  margin: 12px 14px;
+  width: min(340px, 70vw);
+}
+
+.popup-content {
+  max-height: min(58vh, 520px);
+  overflow: auto;
+  padding-right: 4px;
 }
 
 .popup-content h3 {
   margin: 0 0 10px;
-  font-size: 1.05rem;
+  font-size: 1rem;
 }
 
 .popup-kicker,
 .popup-note {
   margin: 0 0 8px;
   color: var(--muted);
-  font-size: 0.88rem;
+  font-size: 0.82rem;
 }
 
 .popup-highlight {
   margin: 0 0 12px;
-  padding: 10px 12px;
+  padding: 9px 11px;
   border-radius: 12px;
-  background: #f2f8fb;
+  background: rgba(77, 176, 255, 0.12);
 }
 
 .popup-table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 12px;
-  font-size: 0.9rem;
+  margin-top: 10px;
+  font-size: 0.84rem;
 }
 
 .popup-table th,
 .popup-table td {
   vertical-align: top;
-  padding: 8px 6px;
+  padding: 7px 6px;
   text-align: left;
-  border-top: 1px solid rgba(39, 72, 92, 0.12);
+  border-top: 1px solid rgba(91, 140, 182, 0.16);
 }
 
 .popup-table th {
@@ -292,17 +393,26 @@ button:hover {
 
 .popup-table .active-row th,
 .popup-table .active-row td {
-  background: #f6fbfd;
+  background: rgba(77, 176, 255, 0.08);
 }
 
 .metadata-table th {
   width: 48%;
 }
 
+.popup-details {
+  margin-top: 12px;
+}
+
+.popup-details summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: 700;
+}
+
 @media (max-width: 840px) {
   .app-header {
-    align-items: flex-start;
-    flex-direction: column;
+    width: calc(100vw - 36px);
   }
 
   .control-panel {

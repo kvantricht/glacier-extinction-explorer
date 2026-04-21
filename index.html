@@ -14,60 +14,90 @@
   <body>
     <div id="app-shell">
       <header class="app-header">
-        <div>
-          <p class="eyebrow">Interactive GeoParquet Demo</p>
+        <div class="header-copy">
+          <p class="eyebrow">Swiss Glacier Explorer</p>
           <h1>Swiss Glacier Extinction Explorer</h1>
         </div>
-        <button id="reset-view-button" class="ghost-button" type="button">
-          Reset View
-        </button>
       </header>
 
-      <aside class="control-panel">
-        <section>
-          <h2>Explore</h2>
-          <p class="panel-copy">
-            Pan and zoom across Switzerland, switch emissions scenarios, then
-            hover or click a glacier to inspect extinction timing and metadata.
-          </p>
-        </section>
-
-        <section>
-          <label for="scenario-select">Active scenario</label>
-          <select id="scenario-select" aria-label="Select emissions scenario"></select>
-          <p id="scenario-stats" class="microcopy"></p>
-        </section>
-
-        <section id="search-section">
-          <label for="search-input">Find glacier</label>
-          <div class="search-row">
-            <input
-              id="search-input"
-              type="search"
-              placeholder="Search by glacier name"
-              autocomplete="off"
-            />
-            <button id="search-button" type="button">Go</button>
+      <aside class="control-panel" id="control-panel">
+        <div class="panel-toolbar">
+          <h2 class="panel-title">Controls</h2>
+          <div class="toolbar-actions">
+            <button id="reset-view-button" class="ghost-button compact-button" type="button">
+              Reset
+            </button>
+            <button
+              id="panel-toggle-button"
+              class="ghost-button compact-button"
+              type="button"
+              aria-expanded="true"
+              aria-controls="control-panel-body"
+            >
+              Collapse
+            </button>
           </div>
-          <p id="search-status" class="microcopy"></p>
-        </section>
+        </div>
 
-        <section>
-          <div class="legend-header">
-            <h2>Legend</h2>
-            <span id="active-scenario-chip" class="scenario-chip"></span>
-          </div>
-          <div id="legend" class="legend"></div>
-        </section>
+        <div id="control-panel-body" class="control-panel-body">
+          <section>
+            <h2>Explore</h2>
+            <p class="panel-copy">
+              Pan and zoom across Switzerland, switch emissions scenarios, then
+              hover or click a glacier to inspect extinction timing and metadata.
+            </p>
+          </section>
 
-        <section>
-          <h2>Dataset</h2>
-          <dl id="dataset-summary" class="summary-list"></dl>
-        </section>
+          <section>
+            <label for="scenario-select">Active scenario</label>
+            <select id="scenario-select" aria-label="Select emissions scenario"></select>
+            <p id="scenario-stats" class="microcopy"></p>
+          </section>
 
-        <section id="status-box" class="status-box" aria-live="polite">
-          Loading glacier geometries...
-        </section>
+          <section>
+            <h2>Glacier overlay</h2>
+            <label class="inline-toggle" for="overlay-visible-input">
+              <input id="overlay-visible-input" type="checkbox" checked />
+              <span>Show glacier layer</span>
+            </label>
+            <label for="overlay-opacity-input">Overlay opacity</label>
+            <div class="range-row">
+              <input id="overlay-opacity-input" type="range" min="15" max="100" value="72" />
+              <output id="overlay-opacity-value" for="overlay-opacity-input">72%</output>
+            </div>
+          </section>
+
+          <section id="search-section">
+            <label for="search-input">Find glacier</label>
+            <div class="search-row">
+              <input
+                id="search-input"
+                type="search"
+                placeholder="Search by glacier name"
+                autocomplete="off"
+              />
+              <button id="search-button" type="button">Go</button>
+            </div>
+            <p id="search-status" class="microcopy"></p>
+          </section>
+
+          <section>
+            <div class="legend-header">
+              <h2>Legend</h2>
+              <span id="active-scenario-chip" class="scenario-chip"></span>
+            </div>
+            <div id="legend" class="legend"></div>
+          </section>
+
+          <section>
+            <h2>Dataset</h2>
+            <dl id="dataset-summary" class="summary-list"></dl>
+          </section>
+
+          <section id="status-box" class="status-box" aria-live="polite">
+            Loading glacier geometries...
+          </section>
+        </div>
       </aside>
 
       <main id="map" aria-label="Map of Swiss glaciers"></main>
@@ -77,6 +107,6 @@
       src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
       crossorigin=""
     ></script>
-    <script type="module" src="./src/main.js?v=5"></script>
+    <script type="module" src="./src/main.js?v=6"></script>
   </body>
 </html>
