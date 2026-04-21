@@ -1,0 +1,4 @@
+.vendor/
+__pycache__/
+tmp-edge-profile/
+tmp-chrome-profile/

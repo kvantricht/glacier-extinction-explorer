@@ -1,0 +1,93 @@
+{
+  "geometryField": "geometry",
+  "columns": [
+    "fid",
+    "RGIId",
+    "GLIMSId",
+    "BgnDate",
+    "EndDate",
+    "CenLon",
+    "CenLat",
+    "O1Region",
+    "O2Region",
+    "Area",
+    "Zmin",
+    "Zmax",
+    "Zmed",
+    "Slope",
+    "Aspect",
+    "Lmax",
+    "Status",
+    "Connect",
+    "Form",
+    "TermType",
+    "Surging",
+    "Linkages",
+    "Name",
+    "Extinction_Alps_median_15",
+    "Extinction_Alps_Q1_15",
+    "Extinction_Alps_Q3_15",
+    "Extinction_Alps_median_20",
+    "Extinction_Alps_Q1_20",
+    "Extinction_Alps_Q3_20",
+    "Extinction_Alps_median_27",
+    "Extinction_Alps_Q1_27",
+    "Extinction_Alps_Q3_27",
+    "Extinction_Alps_median_40",
+    "Extinction_Alps_Q1_40",
+    "Extinction_Alps_Q3_40",
+    "geometry"
+  ],
+  "scenarioDefinitions": [
+    {
+      "key": "Alps:15",
+      "family": "Alps",
+      "code": "15",
+      "label": "Scenario 1.5\u00b0C",
+      "fields": {
+        "median": "Extinction_Alps_median_15",
+        "Q1": "Extinction_Alps_Q1_15",
+        "Q3": "Extinction_Alps_Q3_15"
+      },
+      "styleField": "Extinction_Alps_median_15"
+    },
+    {
+      "key": "Alps:20",
+      "family": "Alps",
+      "code": "20",
+      "label": "Scenario 2.0\u00b0C",
+      "fields": {
+        "median": "Extinction_Alps_median_20",
+        "Q1": "Extinction_Alps_Q1_20",
+        "Q3": "Extinction_Alps_Q3_20"
+      },
+      "styleField": "Extinction_Alps_median_20"
+    },
+    {
+      "key": "Alps:27",
+      "family": "Alps",
+      "code": "27",
+      "label": "Scenario 2.7\u00b0C",
+      "fields": {
+        "median": "Extinction_Alps_median_27",
+        "Q1": "Extinction_Alps_Q1_27",
+        "Q3": "Extinction_Alps_Q3_27"
+      },
+      "styleField": "Extinction_Alps_median_27"
+    },
+    {
+      "key": "Alps:40",
+      "family": "Alps",
+      "code": "40",
+      "label": "Scenario 4.0\u00b0C",
+      "fields": {
+        "median": "Extinction_Alps_median_40",
+        "Q1": "Extinction_Alps_Q1_40",
+        "Q3": "Extinction_Alps_Q3_40"
+      },
+      "styleField": "Extinction_Alps_median_40"
+    }
+  ],
+  "featureCount": 3927,
+  "source": "test_swiss.parquet"
+}

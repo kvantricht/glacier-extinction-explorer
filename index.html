@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Swiss Glacier Extinction Explorer</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      crossorigin=""
+    />
+    <link rel="stylesheet" href="./src/style.css" />
+  </head>
+  <body>
+    <div id="app-shell">
+      <header class="app-header">
+        <div>
+          <p class="eyebrow">Interactive GeoParquet Demo</p>
+          <h1>Swiss Glacier Extinction Explorer</h1>
+        </div>
+        <button id="reset-view-button" class="ghost-button" type="button">
+          Reset View
+        </button>
+      </header>
+
+      <aside class="control-panel">
+        <section>
+          <h2>Explore</h2>
+          <p class="panel-copy">
+            Pan and zoom across Switzerland, switch emissions scenarios, then
+            hover or click a glacier to inspect extinction timing and metadata.
+          </p>
+        </section>
+
+        <section>
+          <label for="scenario-select">Active scenario</label>
+          <select id="scenario-select" aria-label="Select emissions scenario"></select>
+          <p id="scenario-stats" class="microcopy"></p>
+        </section>
+
+        <section id="search-section">
+          <label for="search-input">Find glacier</label>
+          <div class="search-row">
+            <input
+              id="search-input"
+              type="search"
+              placeholder="Search by glacier name"
+              autocomplete="off"
+            />
+            <button id="search-button" type="button">Go</button>
+          </div>
+          <p id="search-status" class="microcopy"></p>
+        </section>
+
+        <section>
+          <div class="legend-header">
+            <h2>Legend</h2>
+            <span id="active-scenario-chip" class="scenario-chip"></span>
+          </div>
+          <div id="legend" class="legend"></div>
+        </section>
+
+        <section>
+          <h2>Dataset</h2>
+          <dl id="dataset-summary" class="summary-list"></dl>
+        </section>
+
+        <section id="status-box" class="status-box" aria-live="polite">
+          Loading glacier geometries...
+        </section>
+      </aside>
+
+      <main id="map" aria-label="Map of Swiss glaciers"></main>
+    </div>
+
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      crossorigin=""
+    ></script>
+    <script type="module" src="./src/main.js?v=5"></script>
+  </body>
+</html>
