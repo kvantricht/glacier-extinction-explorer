@@ -3,13 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <title>Swiss Glacier Extinction Explorer</title>
     <link
       rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
       crossorigin=""
     />
-    <link rel="stylesheet" href="./src/style.css" />
+    <link rel="stylesheet" href="./src/style.css?v=4" />
   </head>
   <body>
     <div id="app-shell">
@@ -62,21 +65,23 @@
             </label>
             <label for="overlay-opacity-input">Overlay opacity</label>
             <div class="range-row">
-              <input id="overlay-opacity-input" type="range" min="15" max="100" value="72" />
-              <output id="overlay-opacity-value" for="overlay-opacity-input">72%</output>
+              <input id="overlay-opacity-input" type="range" min="15" max="100" value="75" />
+              <output id="overlay-opacity-value" for="overlay-opacity-input">75%</output>
             </div>
           </section>
 
           <section id="search-section">
             <label for="search-input">Find glacier</label>
-            <div class="search-row">
+            <div class="search-box">
               <input
                 id="search-input"
                 type="search"
                 placeholder="Search by glacier name"
                 autocomplete="off"
+                aria-autocomplete="list"
+                aria-controls="search-results"
               />
-              <button id="search-button" type="button">Go</button>
+              <div id="search-results" class="search-results" hidden></div>
             </div>
             <p id="search-status" class="microcopy"></p>
           </section>
@@ -89,16 +94,15 @@
             <div id="legend" class="legend"></div>
           </section>
 
-          <section>
-            <h2>Dataset</h2>
-            <dl id="dataset-summary" class="summary-list"></dl>
-          </section>
-
-          <section id="status-box" class="status-box" aria-live="polite">
-            Loading glacier geometries...
-          </section>
         </div>
       </aside>
+
+      <div id="status-box" class="loading-overlay" aria-live="polite">
+        <div class="loading-card">
+          <div class="loading-spinner" aria-hidden="true"></div>
+          <p id="status-message" class="loading-message">Loading glaciers</p>
+        </div>
+      </div>
 
       <main id="map" aria-label="Map of Swiss glaciers"></main>
     </div>
@@ -107,6 +111,6 @@
       src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
       crossorigin=""
     ></script>
-    <script type="module" src="./src/main.js?v=6"></script>
+    <script type="module" src="./src/main.js?v=26"></script>
   </body>
 </html>

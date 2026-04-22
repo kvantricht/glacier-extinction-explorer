@@ -9,7 +9,7 @@ export const SCENARIO_STAT_PRIORITY = ["median", "Q1", "Q3"];
 export const YEAR_STYLE = {
   alreadyExtinct: "#7f0000",
   ramp: ["#c72e29", "#e3692e", "#f1a340", "#f9d27b", "#d7ecf6", "#92c5de"],
-  survives: "#eff8ff",
+  survives: "#5aa9d6",
   missing: "#cbd5e1",
   outline: "#365266",
   hover: "#0f172a",
@@ -68,6 +68,8 @@ export const CURRENT_YEAR = new Date().getFullYear();
 
 export const VALID_YEAR_MIN = 1850;
 export const VALID_YEAR_MAX = 2500;
+export const STUDY_HORIZON_YEAR = 2100;
+export const DETAIL_POLYGON_ZOOM = 11;
 
 export function formatScenarioLabel(code) {
   if (!/^\d+$/.test(code)) {

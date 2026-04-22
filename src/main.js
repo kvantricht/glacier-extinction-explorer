@@ -1,10 +1,12 @@
 import {
   CURRENT_YEAR,
+  DETAIL_POLYGON_ZOOM,
   METADATA_FIELD_LABELS,
   METADATA_FIELD_PRIORITY,
+  STUDY_HORIZON_YEAR,
   YEAR_STYLE,
-} from "./config.js";
-import { loadDataset } from "./data.js?v=5";
+} from "./config.js?v=7";
+import { loadDataset } from "./data.js?v=11";
 
 const map = L.map("map", {
   zoomControl: false,
@@ -40,18 +42,18 @@ L.control
   )
   .addTo(map);
 
-const statusBox = document.querySelector("#status-box");
+let statusBox = document.querySelector("#status-box");
+let statusMessage = document.querySelector("#status-message");
 const scenarioSelect = document.querySelector("#scenario-select");
 const scenarioStats = document.querySelector("#scenario-stats");
 const legendContainer = document.querySelector("#legend");
 const activeScenarioChip = document.querySelector("#active-scenario-chip");
-const datasetSummary = document.querySelector("#dataset-summary");
 const resetViewButton = document.querySelector("#reset-view-button");
 const panelToggleButton = document.querySelector("#panel-toggle-button");
 const controlPanel = document.querySelector("#control-panel");
 const searchSection = document.querySelector("#search-section");
 const searchInput = document.querySelector("#search-input");
-const searchButton = document.querySelector("#search-button");
+const searchResults = document.querySelector("#search-results");
 const searchStatus = document.querySelector("#search-status");
 const overlayVisibleInput = document.querySelector("#overlay-visible-input");
 const overlayOpacityInput = document.querySelector("#overlay-opacity-input");
@@ -59,6 +61,7 @@ const overlayOpacityValue = document.querySelector("#overlay-opacity-value");
 
 let datasetState = null;
 let glacierLayer = null;
+let glacierPointLayer = null;
 let selectedLayer = null;
 let selectedFeatureId = null;
 let defaultBounds = null;
@@ -66,9 +69,59 @@ let overlayVisible = true;
 let overlayOpacity = Number(overlayOpacityInput.value) / 100;
 const DEFAULT_SCENARIO_CODE = "27";
 
+function removeLegacyDatasetSection() {
+  const datasetSummary = document.querySelector("#dataset-summary");
+  if (datasetSummary) {
+    datasetSummary.closest("section")?.remove();
+  }
+
+  for (const heading of document.querySelectorAll(".control-panel h2")) {
+    if (heading.textContent?.trim() === "Dataset") {
+      heading.closest("section")?.remove();
+    }
+  }
+}
+
+function ensureStatusOverlay() {
+  removeLegacyDatasetSection();
+
+  const legacyStatusSection =
+    statusBox?.closest(".control-panel") && statusBox.tagName === "SECTION" ? statusBox : null;
+  if (legacyStatusSection) {
+    legacyStatusSection.remove();
+    statusBox = null;
+    statusMessage = null;
+  }
+
+  if (!statusBox || !statusMessage) {
+    statusBox = document.createElement("div");
+    statusBox.id = "status-box";
+    statusBox.className = "loading-overlay";
+    statusBox.setAttribute("aria-live", "polite");
+    statusBox.hidden = true;
+    statusBox.innerHTML = `
+      <div class="loading-card">
+        <div class="loading-spinner" aria-hidden="true"></div>
+        <p id="status-message" class="loading-message"></p>
+      </div>
+    `;
+    document.querySelector("#app-shell")?.append(statusBox);
+    statusMessage = statusBox.querySelector("#status-message");
+  }
+}
+
 function setStatus(message, tone = "default") {
-  statusBox.textContent = message;
+  ensureStatusOverlay();
+  statusBox.hidden = false;
+  statusMessage.textContent = message;
   statusBox.dataset.tone = tone;
+}
+
+function clearStatus() {
+  ensureStatusOverlay();
+  statusBox.hidden = true;
+  statusMessage.textContent = "";
+  delete statusBox.dataset.tone;
 }
 
 function escapeHtml(value) {
@@ -117,28 +170,45 @@ function getCurrentScenario() {
   return datasetState.scenarios.find((scenario) => scenario.key === scenarioSelect.value);
 }
 
+function interpolateHexColor(startHex, endHex, ratio) {
+  const clamped = Math.max(0, Math.min(1, ratio));
+  const start = startHex.match(/[0-9a-f]{2}/gi).map((part) => Number.parseInt(part, 16));
+  const end = endHex.match(/[0-9a-f]{2}/gi).map((part) => Number.parseInt(part, 16));
+  const channels = start.map((value, index) =>
+    Math.round(value + (end[index] - value) * clamped)
+      .toString(16)
+      .padStart(2, "0")
+  );
+  return `#${channels.join("")}`;
+}
+
+function getYearColor(year) {
+  const extent = datasetState.yearExtent;
+  if (!extent || extent.max <= extent.min) {
+    return YEAR_STYLE.ramp[Math.floor(YEAR_STYLE.ramp.length / 2)];
+  }
+
+  const segmentCount = YEAR_STYLE.ramp.length - 1;
+  const position = ((year - extent.min) / (extent.max - extent.min)) * segmentCount;
+  const leftIndex = Math.max(0, Math.min(segmentCount - 1, Math.floor(position)));
+  const localRatio = position - leftIndex;
+  return interpolateHexColor(YEAR_STYLE.ramp[leftIndex], YEAR_STYLE.ramp[leftIndex + 1], localRatio);
+}
+
 function classifyYearValue(normalized) {
   if (!normalized || normalized.kind === "missing") {
-    return { color: YEAR_STYLE.missing, label: "Missing extinction year" };
+    return { color: YEAR_STYLE.survives, label: "Survives beyond 2100" };
   }
 
   if (normalized.kind === "survives") {
-    return { color: YEAR_STYLE.survives, label: "Survives beyond study horizon" };
+    return { color: YEAR_STYLE.survives, label: "Survives beyond 2100" };
   }
 
   if (normalized.kind === "alreadyExtinct") {
-    return { color: YEAR_STYLE.alreadyExtinct, label: `Already extinct by ${CURRENT_YEAR}` };
+    return { color: YEAR_STYLE.alreadyExtinct, label: "Already extinct" };
   }
 
-  const binIndex = datasetState.legendBins.findIndex(
-    (bin) => normalized.numeric >= bin.min && normalized.numeric <= bin.max
-  );
-
-  const color =
-    YEAR_STYLE.ramp[Math.max(0, Math.min(YEAR_STYLE.ramp.length - 1, binIndex))] ??
-    YEAR_STYLE.ramp[YEAR_STYLE.ramp.length - 1];
-
-  return { color, label: normalized.label };
+  return { color: getYearColor(normalized.numeric), label: normalized.label };
 }
 
 function styleFeature(feature) {
@@ -151,22 +221,59 @@ function styleFeature(feature) {
     color: isSelected ? YEAR_STYLE.selected : YEAR_STYLE.outline,
     weight: isSelected ? 2.4 : 1.1,
     fillColor: classification.color,
-    fillOpacity: (isSelected ? 0.88 : 0.7) * overlayOpacity,
-    opacity: (isSelected ? 1 : 0.9) * Math.max(overlayOpacity, 0.35),
+    fillOpacity: overlayOpacity,
+    opacity: overlayOpacity,
+  };
+}
+
+function stylePointFeature(feature) {
+  const scenario = getCurrentScenario();
+  const normalized = feature.properties.__scenarioValues[scenario.key];
+  const classification = classifyYearValue(normalized);
+  const isSelected = selectedFeatureId === getFeatureId(feature);
+  const outlineColor = isSelected ? YEAR_STYLE.selected : classification.color;
+
+  return {
+    radius: isSelected ? 8.5 : 6.5,
+    color: outlineColor,
+    weight: isSelected ? 2.4 : 1.4,
+    fillColor: classification.color,
+    fillOpacity: overlayOpacity,
+    opacity: overlayOpacity,
   };
 }
 
 function applyHoverStyle(layer) {
-  layer.setStyle({
-    weight: 2.8,
-    color: YEAR_STYLE.hover,
-    fillOpacity: 0.95 * overlayOpacity,
-  });
+  const hoverStyle =
+    layer.__displayKind === "point"
+      ? {
+          radius: 8.5,
+          weight: 2.6,
+          color: YEAR_STYLE.hover,
+          fillOpacity: overlayOpacity,
+        }
+      : {
+          weight: 2.8,
+          color: YEAR_STYLE.hover,
+          fillOpacity: overlayOpacity,
+        };
+
+  layer.setStyle(hoverStyle);
   layer.bringToFront();
 }
 
 function restoreLayerStyle(layer) {
-  layer.setStyle(styleFeature(layer.feature));
+  const style = layer.__displayKind === "point" ? stylePointFeature(layer.feature) : styleFeature(layer.feature);
+  layer.setStyle(style);
+}
+
+function getFeatureCenter(feature) {
+  const latitude = Number(feature.properties.DisplayLat ?? feature.properties.CenLat);
+  const longitude = Number(feature.properties.DisplayLon ?? feature.properties.CenLon);
+  if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+    return L.latLng(latitude, longitude);
+  }
+  return null;
 }
 
 function buildScenarioTable(feature, activeScenario) {
@@ -252,11 +359,15 @@ function buildPopupContent(feature) {
 function buildTooltipContent(feature) {
   const activeScenario = getCurrentScenario();
   const title = feature.properties.Name || feature.properties.RGIId || feature.properties.GLIMSId || "Glacier";
-  const value = feature.properties.__scenarioValues[activeScenario.key];
+  const scenarioLines = datasetState.scenarios
+    .map((scenario) => {
+      const value = feature.properties.__scenarioValues[scenario.key];
+      const line = `${escapeHtml(scenario.label)}: ${escapeHtml(value?.label ?? "Missing")}`;
+      return scenario.key === activeScenario.key ? `<strong>${line}</strong>` : line;
+    })
+    .join("<br>");
 
-  return `<strong>${escapeHtml(title)}</strong><br>${escapeHtml(activeScenario.label)}: ${escapeHtml(
-    value?.label ?? "Missing"
-  )}`;
+  return `<strong>${escapeHtml(title)}</strong><br>${scenarioLines}`;
 }
 
 function updateLegend() {
@@ -264,8 +375,8 @@ function updateLegend() {
   activeScenarioChip.textContent = scenario.label;
 
   const items = datasetState.legendBins
-    .map((bin, index) => {
-      const color = YEAR_STYLE.ramp[Math.min(index, YEAR_STYLE.ramp.length - 1)];
+    .map((bin) => {
+      const color = getYearColor(Math.round((bin.min + bin.max) / 2));
       return `
         <div class="legend-item">
           <span class="legend-swatch" style="background:${color}"></span>
@@ -281,109 +392,183 @@ function updateLegend() {
     </p>
     <div class="legend-item">
       <span class="legend-swatch" style="background:${YEAR_STYLE.alreadyExtinct}"></span>
-      <span>Already extinct before ${CURRENT_YEAR}</span>
+      <span>Already extinct</span>
     </div>
     ${items}
     <div class="legend-item">
       <span class="legend-swatch" style="background:${YEAR_STYLE.survives}"></span>
-      <span>Survives beyond study horizon</span>
-    </div>
-    <div class="legend-item">
-      <span class="legend-swatch" style="background:${YEAR_STYLE.missing}"></span>
-      <span>Missing value</span>
+      <span>Survives through ${STUDY_HORIZON_YEAR}</span>
     </div>
   `;
 }
 
 function updateScenarioStats() {
   const scenario = getCurrentScenario();
-  let valid = 0;
+  let disappearsBeforeHorizon = 0;
   let survives = 0;
 
   for (const feature of datasetState.featureCollection.features) {
     const normalized = feature.properties.__scenarioValues[scenario.key];
     if (normalized?.kind === "year" || normalized?.kind === "alreadyExtinct") {
-      valid += 1;
+      disappearsBeforeHorizon += 1;
     } else if (normalized?.kind === "survives") {
       survives += 1;
     }
   }
 
-  scenarioStats.textContent = `${valid.toLocaleString()} of ${datasetState.featureCollection.features.length.toLocaleString()} glaciers have a usable extinction year for ${scenario.label}. ${survives.toLocaleString()} are marked as surviving beyond the study horizon.`;
-}
-
-function updateDatasetSummary() {
-  const summaryEntries = [
-    ["Features", datasetState.featureCollection.features.length.toLocaleString()],
-    ["Geometry column", datasetState.geometryField],
-    ["Scenario fields", datasetState.scenarios.map((scenario) => scenario.styleField).join(", ")],
-    ["Primary ID field", datasetState.primaryIdField ?? "None detected"],
-  ];
-
-  datasetSummary.innerHTML = summaryEntries
-    .map(([term, value]) => `<dt>${escapeHtml(term)}</dt><dd>${escapeHtml(value)}</dd>`)
-    .join("");
+  scenarioStats.textContent = `${disappearsBeforeHorizon.toLocaleString()} glaciers disappear before ${STUDY_HORIZON_YEAR} under ${scenario.label}, while ${survives.toLocaleString()} survive through ${STUDY_HORIZON_YEAR}.`;
 }
 
 function updateLayerStyles() {
-  if (!glacierLayer) {
+  if (!glacierLayer && !glacierPointLayer) {
     return;
   }
 
-  glacierLayer.eachLayer((layer) => {
-    restoreLayerStyle(layer);
-    layer.setTooltipContent(buildTooltipContent(layer.feature));
-    if (layer.isPopupOpen()) {
-      layer.setPopupContent(buildPopupContent(layer.feature));
-    }
+  [glacierLayer, glacierPointLayer].filter(Boolean).forEach((mapLayer) => {
+    mapLayer.eachLayer((layer) => {
+      restoreLayerStyle(layer);
+      if (layer.getTooltip?.()) {
+        layer.setTooltipContent(buildTooltipContent(layer.feature));
+      }
+      if (layer.isPopupOpen() && layer.getPopup?.()) {
+        layer.setPopupContent(buildPopupContent(layer.feature));
+      }
+    });
   });
+}
+
+function shouldShowPolygons() {
+  return map.getZoom() >= DETAIL_POLYGON_ZOOM;
+}
+
+function createPolygonLayer() {
+  return L.geoJSON(datasetState.featureCollection, {
+    style: styleFeature,
+    onEachFeature(feature, layer) {
+      wireLayerInteractions(layer, "polygon");
+    },
+  });
+}
+
+function ensurePolygonLayer() {
+  if (!glacierLayer && datasetState?.featureCollection) {
+    glacierLayer = createPolygonLayer();
+  }
+  return glacierLayer;
+}
+
+function getActiveGlacierLayer() {
+  return shouldShowPolygons() ? ensurePolygonLayer() : glacierPointLayer;
+}
+
+function updateDisplayedGeometryLayer() {
+  if (!glacierPointLayer) {
+    return;
+  }
+
+  const activeLayer = getActiveGlacierLayer();
+  const inactiveLayer = activeLayer === glacierLayer ? glacierPointLayer : glacierLayer;
+  if (!activeLayer) {
+    return;
+  }
+
+  if (!overlayVisible) {
+    if (glacierLayer && map.hasLayer(glacierLayer)) {
+      map.removeLayer(glacierLayer);
+    }
+    if (glacierPointLayer && map.hasLayer(glacierPointLayer)) {
+      map.removeLayer(glacierPointLayer);
+    }
+    selectedLayer = null;
+    return;
+  }
+
+  if (!map.hasLayer(activeLayer)) {
+    activeLayer.addTo(map);
+  }
+  if (inactiveLayer && map.hasLayer(inactiveLayer)) {
+    map.removeLayer(inactiveLayer);
+  }
+
+  updateLayerStyles();
 }
 
 function updateOverlayState() {
   overlayOpacityValue.textContent = `${Math.round(overlayOpacity * 100)}%`;
 
-  if (!glacierLayer) {
+  if (!glacierPointLayer) {
     return;
   }
 
-  if (overlayVisible) {
-    if (!map.hasLayer(glacierLayer)) {
-      glacierLayer.addTo(map);
-    }
-    updateLayerStyles();
-  } else if (map.hasLayer(glacierLayer)) {
-    map.removeLayer(glacierLayer);
+  if (!overlayVisible) {
     selectedLayer = null;
     selectedFeatureId = null;
   }
+
+  updateDisplayedGeometryLayer();
 }
 
 function zoomToFeature(feature) {
-  const matchLayer = glacierLayer
-    .getLayers()
+  const polygonLayer = ensurePolygonLayer()
+    ?.getLayers()
+    .find((layer) => getFeatureId(layer.feature) === getFeatureId(feature));
+  const activeLayer = getActiveGlacierLayer();
+  const matchLayer = activeLayer
+    ?.getLayers()
     .find((layer) => getFeatureId(layer.feature) === getFeatureId(feature));
 
-  if (!matchLayer) {
+  if (!polygonLayer) {
     return;
   }
 
   selectedFeatureId = getFeatureId(feature);
-  selectedLayer = matchLayer;
+  selectedLayer = matchLayer ?? polygonLayer;
   updateLayerStyles();
-  map.fitBounds(matchLayer.getBounds(), { maxZoom: 12, padding: [30, 30] });
-  matchLayer.openPopup();
+  map.fitBounds(polygonLayer.getBounds(), { maxZoom: 12, padding: [30, 30] });
+
+  map.once("moveend", () => {
+    updateDisplayedGeometryLayer();
+    const targetLayer = getActiveGlacierLayer()
+      ?.getLayers()
+      .find((layer) => getFeatureId(layer.feature) === getFeatureId(feature));
+    ensureLayerPopup(targetLayer);
+    targetLayer?.openPopup();
+  });
 }
 
-function wireLayerInteractions(layer) {
+function ensureLayerTooltip(layer) {
+  if (!layer || layer.getTooltip?.()) {
+    return;
+  }
+
   layer.bindTooltip(buildTooltipContent(layer.feature), {
     direction: "top",
     sticky: true,
     opacity: 0.95,
   });
+}
 
-  layer.on("mouseover", () => applyHoverStyle(layer));
+function ensureLayerPopup(layer) {
+  if (!layer || layer.getPopup?.()) {
+    return;
+  }
+
+  layer.bindPopup(buildPopupContent(layer.feature), {
+    maxWidth: 360,
+    minWidth: 260,
+  });
+}
+
+function wireLayerInteractions(layer, displayKind = "polygon") {
+  layer.__displayKind = displayKind;
+
+  layer.on("mouseover", () => {
+    ensureLayerTooltip(layer);
+    applyHoverStyle(layer);
+  });
   layer.on("mouseout", () => restoreLayerStyle(layer));
   layer.on("click", () => {
+    ensureLayerPopup(layer);
     selectedFeatureId = getFeatureId(layer.feature);
     selectedLayer = layer;
     updateLayerStyles();
@@ -404,34 +589,163 @@ function initializeSearch() {
     return;
   }
 
+  let activeResultIndex = -1;
+  let currentResults = [];
+
+  function getSearchLabel(feature) {
+    return feature.properties.Name || feature.properties.RGIId || feature.properties.GLIMSId || "Unnamed glacier";
+  }
+
+  function getSearchMeta(feature) {
+    return [feature.properties.RGIId, feature.properties.GLIMSId].filter(Boolean).join(" • ");
+  }
+
+  function rankFeatureMatch(feature, query) {
+    let bestScore = Number.POSITIVE_INFINITY;
+
+    for (const field of datasetState.searchFields) {
+      const raw = String(feature.properties[field] ?? "").trim();
+      if (!raw) {
+        continue;
+      }
+
+      const value = raw.toLowerCase();
+      const index = value.indexOf(query);
+      if (index === -1) {
+        continue;
+      }
+
+      const score =
+        index === 0 ? 0 :
+        value.includes(` ${query}`) ? 1 :
+        2 + index;
+      bestScore = Math.min(bestScore, score);
+    }
+
+    return Number.isFinite(bestScore) ? bestScore : null;
+  }
+
+  function hideResults() {
+    searchResults.hidden = true;
+    searchResults.innerHTML = "";
+    activeResultIndex = -1;
+  }
+
+  function applySearchResult(feature) {
+    searchInput.value = getSearchLabel(feature);
+    searchStatus.textContent = "";
+    hideResults();
+    zoomToFeature(feature);
+  }
+
+  function renderResults(results) {
+    currentResults = results;
+    activeResultIndex = -1;
+
+    if (!results.length) {
+      hideResults();
+      return;
+    }
+
+    searchResults.hidden = false;
+    searchResults.innerHTML = results
+      .map((feature, index) => {
+        const title = escapeHtml(getSearchLabel(feature));
+        const meta = escapeHtml(getSearchMeta(feature));
+        return `
+          <button class="search-result" type="button" data-index="${index}">
+            <span class="search-result-title">${title}</span>
+            ${meta ? `<span class="search-result-meta">${meta}</span>` : ""}
+          </button>
+        `;
+      })
+      .join("");
+
+    searchResults.querySelectorAll(".search-result").forEach((button) => {
+      button.addEventListener("click", () => {
+        const index = Number(button.dataset.index);
+        applySearchResult(results[index]);
+      });
+    });
+  }
+
+  function updateActiveResult() {
+    searchResults.querySelectorAll(".search-result").forEach((button, index) => {
+      button.classList.toggle("is-active", index === activeResultIndex);
+    });
+  }
+
   function runSearch() {
     const query = searchInput.value.trim().toLowerCase();
     if (!query) {
       searchStatus.textContent = "";
+      currentResults = [];
+      hideResults();
       return;
     }
 
-    const feature = datasetState.featureCollection.features.find((candidate) =>
-      datasetState.searchFields.some((field) =>
-        String(candidate.properties[field] ?? "")
-          .toLowerCase()
-          .includes(query)
-      )
-    );
+    const matches = datasetState.featureCollection.features
+      .map((feature) => ({
+        feature,
+        score: rankFeatureMatch(feature, query),
+      }))
+      .filter((entry) => entry.score !== null)
+      .sort((left, right) => left.score - right.score || getSearchLabel(left.feature).localeCompare(getSearchLabel(right.feature)))
+      .slice(0, 8)
+      .map((entry) => entry.feature);
 
-    if (!feature) {
+    if (!matches.length) {
+      currentResults = [];
+      hideResults();
       searchStatus.textContent = `No glacier matched "${query}".`;
       return;
     }
 
     searchStatus.textContent = "";
-    zoomToFeature(feature);
+    renderResults(matches);
   }
 
-  searchButton.addEventListener("click", runSearch);
+  searchInput.addEventListener("input", runSearch);
   searchInput.addEventListener("keydown", (event) => {
+    if (event.key === "ArrowDown" && currentResults.length) {
+      event.preventDefault();
+      activeResultIndex = Math.min(activeResultIndex + 1, currentResults.length - 1);
+      updateActiveResult();
+      return;
+    }
+
+    if (event.key === "ArrowUp" && currentResults.length) {
+      event.preventDefault();
+      activeResultIndex = Math.max(activeResultIndex - 1, 0);
+      updateActiveResult();
+      return;
+    }
+
     if (event.key === "Enter") {
-      runSearch();
+      event.preventDefault();
+      if (activeResultIndex >= 0 && currentResults[activeResultIndex]) {
+        applySearchResult(currentResults[activeResultIndex]);
+      } else if (currentResults[0]) {
+        applySearchResult(currentResults[0]);
+      } else {
+        runSearch();
+      }
+    }
+
+    if (event.key === "Escape") {
+      hideResults();
+    }
+  });
+
+  searchInput.addEventListener("focus", () => {
+    if (currentResults.length) {
+      searchResults.hidden = false;
+    }
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!searchSection.contains(event.target)) {
+      hideResults();
     }
   });
 }
@@ -445,7 +759,8 @@ function initializePanelToggle() {
 }
 
 async function bootstrap() {
-  setStatus("Loading glacier geometries...");
+  ensureStatusOverlay();
+  setStatus("Loading glaciers", "loading");
 
   const result = await loadDataset();
   datasetState = {
@@ -465,23 +780,27 @@ async function bootstrap() {
     datasetState.scenarios.find((scenario) => scenario.code === DEFAULT_SCENARIO_CODE)?.key ??
     datasetState.scenarios[0].key;
 
-  glacierLayer = L.geoJSON(datasetState.featureCollection, {
-    style: styleFeature,
-    onEachFeature(feature, layer) {
-      layer.bindPopup(buildPopupContent(feature), {
-        maxWidth: 360,
-        minWidth: 260,
-      });
-      wireLayerInteractions(layer);
-    },
-  }).addTo(map);
+  glacierPointLayer = L.featureGroup(
+    datasetState.featureCollection.features.map((feature) => {
+      const center = getFeatureCenter(feature);
+      if (!center) {
+        return null;
+      }
+      const marker = L.circleMarker(center, stylePointFeature(feature));
+      marker.feature = feature;
+      wireLayerInteractions(marker, "point");
+      return marker;
+    }).filter(Boolean)
+  );
 
-  defaultBounds = glacierLayer.getBounds();
+  defaultBounds = glacierPointLayer.getBounds();
   if (defaultBounds.isValid()) {
     map.fitBounds(defaultBounds, { padding: [24, 24] });
   } else {
     map.setView([46.8, 8.2], 8);
   }
+
+  updateDisplayedGeometryLayer();
 
   scenarioSelect.addEventListener("change", () => {
     updateLegend();
@@ -505,13 +824,14 @@ async function bootstrap() {
     }
   });
 
+  map.on("zoomend", updateDisplayedGeometryLayer);
+
   initializePanelToggle();
   updateLegend();
   updateScenarioStats();
-  updateDatasetSummary();
   initializeSearch();
   updateOverlayState();
-  setStatus("Loaded Swiss glacier geometries.", "success");
+  clearStatus();
 }
 
 bootstrap().catch((error) => {

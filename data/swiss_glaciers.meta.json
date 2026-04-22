@@ -36,7 +36,9 @@
     "Extinction_Alps_median_40",
     "Extinction_Alps_Q1_40",
     "Extinction_Alps_Q3_40",
-    "geometry"
+    "geometry",
+    "DisplayLon",
+    "DisplayLat"
   ],
   "scenarioDefinitions": [
     {

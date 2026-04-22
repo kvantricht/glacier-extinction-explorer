@@ -94,8 +94,7 @@ If a future dataset uses different naming, update that regex or replace it with 
 - Warmer colors indicate earlier extinction years.
 - Cooler/lighter colors indicate later extinction years.
 - Dark red marks glaciers already extinct before the current year.
-- Pale blue marks glaciers that survive beyond the study horizon.
-- Gray marks missing values.
+- Pale blue marks glaciers that survive beyond 2100, including values previously shown as missing.
 
 The year bins are computed automatically from the valid extinction years found across all detected scenarios, then kept stable while the user switches scenario.
 

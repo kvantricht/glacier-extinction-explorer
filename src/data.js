@@ -6,10 +6,11 @@ import {
   SCENARIO_FIELD_PATTERN,
   SCENARIO_STAT_PRIORITY,
   SEARCH_FIELD_PRIORITY,
+  STUDY_HORIZON_YEAR,
   VALID_YEAR_MAX,
   VALID_YEAR_MIN,
   formatScenarioLabel,
-} from "./config.js";
+} from "./config.js?v=7";
 
 function normalizeScalar(value) {
   if (typeof value === "bigint") {
@@ -21,25 +22,25 @@ function normalizeScalar(value) {
 
 function normalizeYearValue(value) {
   if (value === null || value === undefined || value === "") {
-    return { kind: "missing", numeric: null, label: "Missing" };
+    return { kind: "survives", numeric: null, label: "Survives beyond 2100" };
   }
 
   if (typeof value === "string") {
     const trimmed = value.trim();
     if (!trimmed) {
-      return { kind: "missing", numeric: null, label: "Missing" };
+      return { kind: "survives", numeric: null, label: "Survives beyond 2100" };
     }
 
     const lower = trimmed.toLowerCase();
-    if (lower.includes("survive") || lower.includes("no extinction")) {
-      return { kind: "survives", numeric: null, label: trimmed };
+    if (lower.includes("survive") || lower.includes("no extinction") || lower.includes("missing")) {
+      return { kind: "survives", numeric: null, label: "Survives beyond 2100" };
     }
 
     const parsed = Number(trimmed);
     if (Number.isFinite(parsed)) {
       value = parsed;
     } else {
-      return { kind: "missing", numeric: null, label: trimmed };
+      return { kind: "survives", numeric: null, label: "Survives beyond 2100" };
     }
   }
 
@@ -48,15 +49,15 @@ function normalizeYearValue(value) {
   }
 
   if (!Number.isFinite(value)) {
-    return { kind: "missing", numeric: null, label: "Missing" };
+    return { kind: "survives", numeric: null, label: "Survives beyond 2100" };
   }
 
-  if (value >= 9999 || value > VALID_YEAR_MAX) {
-    return { kind: "survives", numeric: null, label: "Survives beyond study horizon" };
+  if (value >= STUDY_HORIZON_YEAR || value >= 9999 || value > VALID_YEAR_MAX) {
+    return { kind: "survives", numeric: null, label: "Survives beyond 2100" };
   }
 
   if (value <= 0) {
-    return { kind: "missing", numeric: null, label: "Missing" };
+    return { kind: "survives", numeric: null, label: "Survives beyond 2100" };
   }
 
   if (value < VALID_YEAR_MIN) {
@@ -134,7 +135,7 @@ function computeLegendBins(features, scenarios) {
   for (const feature of features) {
     for (const scenario of scenarios) {
       const normalized = feature.properties.__scenarioValues[scenario.key];
-      if (normalized?.kind === "year" || normalized?.kind === "alreadyExtinct") {
+      if (normalized?.kind === "year") {
         years.push(normalized.numeric);
       }
     }
@@ -164,6 +165,27 @@ function computeLegendBins(features, scenarios) {
   }
 
   return bins;
+}
+
+function computeYearExtent(features, scenarios) {
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+
+  for (const feature of features) {
+    for (const scenario of scenarios) {
+      const normalized = feature.properties.__scenarioValues[scenario.key];
+      if (normalized?.kind === "year") {
+        min = Math.min(min, normalized.numeric);
+        max = Math.max(max, normalized.numeric);
+      }
+    }
+  }
+
+  if (!Number.isFinite(min) || !Number.isFinite(max)) {
+    return null;
+  }
+
+  return { min, max };
 }
 
 function buildFeature(row, geometryField, scenarioDefinitions) {
@@ -254,6 +276,7 @@ export async function loadDataset() {
     primarySearchField,
     scenarioDefinitions,
     legendBins: computeLegendBins(normalizedFeatures, scenarioDefinitions),
+    yearExtent: computeYearExtent(normalizedFeatures, scenarioDefinitions),
     featureCollection: {
       type: "FeatureCollection",
       features: normalizedFeatures,
