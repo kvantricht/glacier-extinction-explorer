@@ -195,6 +195,27 @@ function getYearColor(year) {
   return interpolateHexColor(YEAR_STYLE.ramp[leftIndex], YEAR_STYLE.ramp[leftIndex + 1], localRatio);
 }
 
+function getPointRadius(feature, isSelected = false) {
+  const area = Number(feature.properties.Area);
+  const minRadius = 2.5;
+  const maxRadius = 20;
+
+  if (!Number.isFinite(area) || area <= 0) {
+    return isSelected ? minRadius + 2 : minRadius;
+  }
+
+  const areaExtent = datasetState?.areaExtent;
+  if (!areaExtent || areaExtent.max <= areaExtent.min) {
+    return isSelected ? 8.5 : 6.5;
+  }
+
+  const normalized =
+    (Math.log(area) - Math.log(areaExtent.min)) /
+    (Math.log(areaExtent.max) - Math.log(areaExtent.min));
+  const radius = minRadius + Math.max(0, Math.min(1, normalized)) * (maxRadius - minRadius);
+  return isSelected ? radius + 2.5 : radius;
+}
+
 function classifyYearValue(normalized) {
   if (!normalized || normalized.kind === "missing") {
     return { color: YEAR_STYLE.survives, label: "Survives beyond 2100" };
@@ -232,9 +253,10 @@ function stylePointFeature(feature) {
   const classification = classifyYearValue(normalized);
   const isSelected = selectedFeatureId === getFeatureId(feature);
   const outlineColor = isSelected ? YEAR_STYLE.selected : classification.color;
+  const radius = getPointRadius(feature, isSelected);
 
   return {
-    radius: isSelected ? 8.5 : 6.5,
+    radius,
     color: outlineColor,
     weight: isSelected ? 2.4 : 1.4,
     fillColor: classification.color,
@@ -247,7 +269,7 @@ function applyHoverStyle(layer) {
   const hoverStyle =
     layer.__displayKind === "point"
       ? {
-          radius: 8.5,
+          radius: getPointRadius(layer.feature, true),
           weight: 2.6,
           color: YEAR_STYLE.hover,
           fillOpacity: overlayOpacity,
@@ -274,6 +296,30 @@ function getFeatureCenter(feature) {
     return L.latLng(latitude, longitude);
   }
   return null;
+}
+
+function computeAreaExtent(features) {
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+
+  for (const feature of features) {
+    const area = Number(feature.properties.Area);
+    if (Number.isFinite(area) && area > 0) {
+      min = Math.min(min, area);
+      max = Math.max(max, area);
+    }
+  }
+
+  if (!Number.isFinite(min) || !Number.isFinite(max)) {
+    return null;
+  }
+
+  return { min, max };
+}
+
+function getFeatureArea(feature) {
+  const area = Number(feature.properties.Area);
+  return Number.isFinite(area) && area > 0 ? area : 0;
 }
 
 function buildScenarioTable(feature, activeScenario) {
@@ -767,6 +813,7 @@ async function bootstrap() {
     ...result,
     scenarios: result.scenarioDefinitions,
     searchFields: ["Name", "RGIId", "GLIMSId"].filter((field) => result.columns.includes(field)),
+    areaExtent: computeAreaExtent(result.featureCollection.features),
   };
 
   datasetState.scenarios.forEach((scenario) => {
@@ -781,7 +828,9 @@ async function bootstrap() {
     datasetState.scenarios[0].key;
 
   glacierPointLayer = L.featureGroup(
-    datasetState.featureCollection.features.map((feature) => {
+    [...datasetState.featureCollection.features]
+      .sort((left, right) => getFeatureArea(left) - getFeatureArea(right))
+      .map((feature) => {
       const center = getFeatureCenter(feature);
       if (!center) {
         return null;
