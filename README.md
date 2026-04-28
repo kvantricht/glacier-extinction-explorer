@@ -1,116 +1,208 @@
-# Swiss Glacier Extinction Explorer
+# Global Glacier Extinction Explorer
 
-Minimal browser-based web app for exploring Swiss glacier geometries stored in `test_swiss.parquet`.
+A browser-based interactive map for exploring glacier extinction projections worldwide, built with **MapLibre GL JS** and backed by **PMTiles** vector tiles.
 
-## What it does
+Scalable to ~200 000 glaciers: the browser streams only the tiles needed for the current map view rather than loading a monolithic GeoJSON file.
 
-- Converts the source GeoParquet file into GeoJSON for browser use.
-- Detects the geometry column automatically.
-- Detects extinction-year scenario fields from the parquet schema.
-- Styles glacier polygons by extinction year for the selected scenario.
-- Shows hover highlighting, click popups, a legend, search, and reset-view control.
+---
 
-## Stack
+## Architecture overview
 
-- Leaflet for mapping
-- Vanilla JavaScript modules
-- Small Python preprocessing step using `pyarrow`
-- Plain GeoJSON in the browser
+```
+global_glaciers.parquet          ← canonical source-of-truth (external, not in repo)
+         │
+         ▼
+scripts/build_pmtiles.py         ← preprocessing pipeline (Python)
+         │
+         ├── data/glaciers_points.pmtiles    ← overview points, z0–z10
+         ├── data/glaciers_polygons.pmtiles  ← detailed polygons, z10–z16
+         ├── data/search_index.json          ← lightweight typeahead index
+         └── data/build_metadata.json        ← scenario defs, extents, field names
+                  │
+                  ▼
+         index.html + src/       ← MapLibre GL JS frontend (pure static files)
+```
 
-## Run locally
+The **GeoParquet** is the single source of truth.  Generated artifacts (`*.pmtiles`, `search_index.json`, `build_metadata.json`) are **build outputs** – they are `.gitignore`d and should be hosted separately (e.g. on object storage, a CDN, or a local server) rather than committed to the repo.
 
-From this folder, run:
+---
 
-```bat
+## Source-of-truth: GeoParquet schema
+
+The pipeline expects a GeoParquet file with at least:
+
+| Column | Type | Description |
+|---|---|---|
+| geometry | WKB / GeoArrow | Glacier polygon or multipolygon (any CRS; reprojected to WGS-84 automatically) |
+| `RGIId` | string | Stable RGI glacier ID (used as tile feature ID) |
+| `GLIMSId` | string | GLIMS ID |
+| `Name` | string | Display name |
+| `Area` | float | Glacier area in km² |
+| `CenLat`, `CenLon` | float | Centroid (fallback display point) |
+| `Extinction_{family}_{stat}_{code}` | float / int | Per-scenario extinction year fields, e.g. `Extinction_SSP_median_26` |
+
+Additional attribute columns (`Zmin`, `Zmed`, `Zmax`, `Slope`, `Status`, …) are passed through to tile attributes and shown in popups.
+
+### Extinction-year encoding
+
+The build script normalises all extinction-year values into an integer sentinel scheme used inside the vector tiles:
+
+| Raw value | Tile encoding | Meaning |
+|---|---|---|
+| `null`, `NaN`, `""` | `9999` | No data → treated as "survives through 2100" |
+| `>= 2100` or `>= 9000` | `9999` | Projected survival beyond study horizon |
+| `< 1850` | `9999` | Implausible value → treated as survives |
+| `< current year` | `-1` | Already extinct |
+| `2026–2099` | year as-is | Future projected extinction |
+
+---
+
+## Preprocessing: generating build artifacts
+
+### Requirements
+
+```bash
+pip install geopandas pyarrow shapely numpy pyogrio
+```
+
+**`ogr2ogr`** (GDAL) must be on PATH. It ships with GDAL, which is a geopandas dependency:
+
+```bash
+# conda – already available
+conda install geopandas
+
+# Ubuntu / Debian
+sudo apt-get install gdal-bin
+
+# Windows – use OSGeo4W installer: https://trac.osgeo.org/osgeo4w/
+# or install via conda (recommended)
+```
+
+**`pmtiles`** CLI must be on PATH – a single Go binary, no compilation required:
+
+```bash
+# Download the binary for your platform from:
+# https://github.com/protomaps/go-pmtiles/releases
+# Extract and place on PATH (or in the repo root).
+
+# macOS (Homebrew)
+brew install protomaps/go-pmtiles/go-pmtiles
+
+# Linux (download release binary)
+curl -L https://github.com/protomaps/go-pmtiles/releases/latest/download/go-pmtiles_Linux_x86_64.tar.gz | tar xz
+sudo mv pmtiles /usr/local/bin/
+```
+
+### Run the build
+
+```bash
+# Default: reads from the canonical path, writes to ./data/
+python scripts/build_pmtiles.py
+
+# Explicit paths
+python scripts/build_pmtiles.py /path/to/global_glaciers.parquet --out ./data
+```
+
+The script:
+1. Reads the GeoParquet and reprojects to WGS-84 if needed
+2. Normalises extinction years to integer sentinels
+3. Writes **FlatGeobuf** intermediates to a temp directory (compact binary, ~10× smaller than GeoJSON)
+4. Runs `ogr2ogr` (GDAL MVT driver) to generate z/x/y tile directory trees
+5. Runs `pmtiles convert` to package each tile directory into a PMTiles archive
+6. Cleans up all temp files automatically
+7. Writes `search_index.json` and `build_metadata.json` to `data/`
+
+After a successful run `data/` will contain only the final artifacts:
+
+```
+data/
+  glaciers_points.pmtiles      ← loaded by the browser at zoom 0–10
+  glaciers_polygons.pmtiles    ← loaded by the browser at zoom 11–16
+  search_index.json            ← typeahead search index
+  build_metadata.json          ← scenario definitions and extents
+```
+
+### Hosting assumptions
+
+The four generated files in `data/` must be served over HTTP with CORS headers that allow the browser to read them.  Options:
+
+- **Local dev**: a static file server in this directory (see below).
+- **Cloud storage**: upload to S3 / Azure Blob / GCS with public read and permissive CORS, then point `POINTS_PMTILES_URL` / `POLYGONS_PMTILES_URL` / etc. in `src/config.js` to the public URLs.
+- **CDN-fronted object storage**: same as above, ideal for production.
+- **Static hosting (Netlify, GitHub Pages, Vercel)**: commit only the generated `data/` files to a deployment branch or upload them as release assets.
+
+PMTiles are self-contained archives; the browser fetches only the tile chunks it needs via HTTP range requests.  No tile server process is required.
+
+---
+
+## Local development
+
+Serve the repo root over HTTP (any static server works):
+
+```bash
+# Python
+python -m http.server 8080
+
+# Node (npx)
+npx serve .
+
+# Or use the included helper (Windows)
 run-local.cmd
 ```
 
-Then open [http://127.0.0.1:4173](http://127.0.0.1:4173).
+Then open [http://localhost:8080](http://localhost:8080).
 
-The first run builds `data/swiss_glaciers.geojson` and `data/swiss_glaciers.meta.json` from `test_swiss.parquet`, then starts a local static server.
+> **Note:** The app uses ES modules (`type="module"`), so it must be served over HTTP – opening `index.html` directly as a `file://` URL will not work.
 
-If you prefer, you can also run the preprocessing step yourself:
+---
 
-```bat
-set PYTHONPATH=C:\Users\VTRICHTK\OneDrive - VITO\Documents\git\GlacierViz\.vendor\pyarrow
-C:\Users\VTRICHTK\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe scripts\build_geojson.py
-```
+## Frontend overview
 
-After that, any static file server will work as long as it serves this folder over HTTP.
+| File | Role |
+|---|---|
+| `index.html` | App shell, CDN imports for MapLibre GL JS and PMTiles |
+| `src/config.js` | Asset URLs, sentinel constants, color ramp, helpers |
+| `src/main.js` | Map init, PMTiles sources, layer styling, interactions, search |
+| `src/style.css` | Dark-themed UI, MapLibre popup/control overrides, hover tooltip |
 
-## Files
+### Layer strategy
 
-- [index.html](C:/Users/VTRICHTK/OneDrive%20-%20VITO/Documents/git/GlacierViz/index.html) bootstraps the app shell
-- [src/main.js](C:/Users/VTRICHTK/OneDrive%20-%20VITO/Documents/git/GlacierViz/src/main.js) initializes the map and UI
-- [src/data.js](C:/Users/VTRICHTK/OneDrive%20-%20VITO/Documents/git/GlacierViz/src/data.js) loads the parquet and detects scenario fields
-- [scripts/build_geojson.py](C:/Users/VTRICHTK/OneDrive%20-%20VITO/Documents/git/GlacierViz/scripts/build_geojson.py) converts GeoParquet WKB geometry into GeoJSON
-- [src/config.js](C:/Users/VTRICHTK/OneDrive%20-%20VITO/Documents/git/GlacierViz/src/config.js) centralizes scenario detection and styling config
-- [scripts/inspect_parquet_metadata.py](C:/Users/VTRICHTK/OneDrive%20-%20VITO/Documents/git/GlacierViz/scripts/inspect_parquet_metadata.py) prints embedded GeoParquet/GDAL metadata without modifying the dataset
+| Zoom | Layer shown | Source |
+|---|---|---|
+| 0–10 | `glaciers-points` (circles) | `glaciers_points.pmtiles` |
+| 11–16 | `glaciers-polygons-fill` + `glaciers-polygons-line` | `glaciers_polygons.pmtiles` |
 
-## Schema assumptions used
+Point size scales logarithmically with glacier area.  Larger glaciers are rendered above smaller ones (`circle-sort-key`).  At low zoom, tippecanoe drops smaller glaciers first to keep tile sizes manageable.
 
-The parquet file embeds enough metadata to identify the structure without mutating it:
+### Styling
 
-- CRS is geographic WGS84 / EPSG:4326
-- geometry column is `geometry`
-- geometry encoding is WKB
-- geometry type is `MultiPolygon`
-- likely identifier/name fields are `Name`, `RGIId`, `GLIMSId`, and `fid`
-- scenario-related fields follow this pattern:
+Colors are computed from MapLibre GL data-driven expressions at render time:
 
-```text
-Extinction_<family>_<stat>_<scenario-code>
-```
+- **Already extinct** (`-1`): dark red `#7f0000`
+- **Survives through 2100** (`9999` / missing): blue `#5aa9d6`  
+- **Future extinction year**: continuous 6-stop ramp from warm red (earliest) to cool blue (latest), interpolated across the observed year range
 
-For the provided file, the detected fields are:
+Switching scenarios calls `map.setPaintProperty` – no layer rebuild needed.
 
-- `Extinction_Alps_median_15`
-- `Extinction_Alps_Q1_15`
-- `Extinction_Alps_Q3_15`
-- `Extinction_Alps_median_20`
-- `Extinction_Alps_Q1_20`
-- `Extinction_Alps_Q3_20`
-- `Extinction_Alps_median_27`
-- `Extinction_Alps_Q1_27`
-- `Extinction_Alps_Q3_27`
-- `Extinction_Alps_median_40`
-- `Extinction_Alps_Q1_40`
-- `Extinction_Alps_Q3_40`
+### Search
 
-The selector uses the `median` field for each scenario code and keeps `Q1`/`Q3` visible in popups.
+The `search_index.json` is loaded once at startup.  Typeahead search uses substring matching across name, RGI ID, and GLIMS ID fields, ranked by match position.  Selecting a result calls `map.flyTo` and then queries rendered features to open a full popup.
 
-## Scenario detection
+---
 
-Scenario detection is automatic and driven by the regex in [src/config.js](C:/Users/VTRICHTK/OneDrive%20-%20VITO/Documents/git/GlacierViz/src/config.js):
+## Updating with new glacier data
 
-```js
-/^Extinction_(.+)_(median|Q1|Q3)_([0-9]+)$/i
-```
+1. Replace / update the source GeoParquet.
+2. Re-run `python scripts/build_pmtiles.py`.
+3. Upload the new `data/*.pmtiles`, `data/search_index.json`, and `data/build_metadata.json` to your hosting location.
+4. No changes to the frontend HTML/JS/CSS are needed unless the schema or scenario naming convention changes.
 
-If a future dataset uses different naming, update that regex or replace it with an explicit mapping in `src/config.js`.
+---
 
-## Color ramp and legend
+## Scripts
 
-- Warmer colors indicate earlier extinction years.
-- Cooler/lighter colors indicate later extinction years.
-- Dark red marks glaciers already extinct before the current year.
-- Pale blue marks glaciers that survive beyond 2100, including values previously shown as missing.
-
-The year bins are computed automatically from the valid extinction years found across all detected scenarios, then kept stable while the user switches scenario.
-
-## Notes on scaling this up
-
-For the 7 MB Swiss test file, preprocessing to GeoJSON is simple and reliable. For a larger glacier archive, the main changes would be:
-
-1. Preconvert GeoParquet to vector tiles or chunked GeoJSON for faster rendering.
-2. Move schema inspection and scenario-field normalization into a build/preprocessing step.
-3. Use map-side tiling or server-side filtering instead of loading the full dataset at once.
-4. Consider MapLibre GL JS if dynamic styling at larger feature counts becomes important.
-
-## Optional metadata inspection
-
-You can print the embedded GeoParquet/GDAL schema with:
-
-```bat
-C:\Users\VTRICHTK\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe scripts\inspect_parquet_metadata.py test_swiss.parquet
-```
+| Script | Purpose |
+|---|---|
+| `scripts/build_pmtiles.py` | Main preprocessing pipeline |
+| `scripts/build_geojson.py` | Legacy Swiss-glacier GeoJSON builder (kept for reference) |
+| `scripts/inspect_parquet_metadata.py` | Inspect GeoParquet schema without modifying data |
