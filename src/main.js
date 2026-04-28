@@ -826,7 +826,7 @@ function initSearch() {
                 (a, b) =>
                     a.score - b.score || getLabel(a.item).localeCompare(getLabel(b.item))
             )
-            .slice(0, 8)
+            .slice(0, 5)
             .map((e) => e.item);
 
         currentResults = matches;
@@ -876,7 +876,9 @@ function initSearch() {
     });
 
     searchInput.addEventListener("focus", () => {
-        if (currentResults.length) searchResults.hidden = false;
+        if (currentResults.length) {
+            searchResults.hidden = false;
+        }
     });
 
     document.addEventListener("click", (e) => {
@@ -1004,11 +1006,9 @@ async function bootstrap() {
         terrainEnabled = !terrainEnabled;
         if (terrainEnabled) {
             map.setTerrain({ source: "dem", exaggeration: 1.5 });
-            if (map.getPitch() < 30) map.easeTo({ pitch: 45, duration: 600 });
             terrainButton.classList.add("is-active");
         } else {
             map.setTerrain(null);
-            map.easeTo({ pitch: 0, bearing: 0, duration: 600 });
             terrainButton.classList.remove("is-active");
         }
     });

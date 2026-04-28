@@ -257,13 +257,17 @@ button:hover {
 
 .search-results {
     position: absolute;
-    top: calc(100% + 8px);
+    bottom: calc(100% + 8px);
     left: 0;
     right: 0;
     z-index: 20;
     display: grid;
     gap: 6px;
     padding: 8px;
+    width: auto;
+    max-height: min(30vh, 220px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
     border-radius: 14px;
     border: 1px solid rgba(108, 145, 182, 0.22);
     background: rgba(7, 15, 27, 0.96);
@@ -691,6 +695,7 @@ output {
     .legend {
         column-count: 1;
     }
+
 }
 
 @media (max-width: 840px) and (max-height: 760px) {
