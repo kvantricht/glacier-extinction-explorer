@@ -20,73 +20,81 @@
   <div id="app-shell">
     <header class="app-header">
       <div class="header-copy">
-        <p class="eyebrow">Global Glacier Explorer</p>
+        <p class="eyebrow">Interactive map</p>
         <h1>Global Glacier Extinction Explorer</h1>
       </div>
     </header>
 
-    <aside class="control-panel" id="control-panel">
-      <div class="panel-toolbar">
-        <h2 class="panel-title">Controls</h2>
-        <div class="toolbar-actions">
-          <button id="reset-view-button" class="ghost-button compact-button" type="button">
-            Reset
-          </button>
-          <button id="panel-toggle-button" class="ghost-button compact-button" type="button" aria-expanded="true"
-            aria-controls="control-panel-body">
-            Collapse
-          </button>
+    <div class="left-sidebar-stack" id="left-sidebar-stack">
+      <aside class="control-panel" id="control-panel">
+        <div class="panel-toolbar">
+          <h2 class="panel-title">Controls</h2>
+          <div class="toolbar-actions">
+            <button id="reset-view-button" class="ghost-button compact-button" type="button">
+              Reset
+            </button>
+            <button id="panel-toggle-button" class="ghost-button compact-button" type="button" aria-expanded="true"
+              aria-controls="control-panel-body">
+              Collapse
+            </button>
+          </div>
         </div>
+
+        <div id="control-panel-body" class="control-panel-body">
+          <section>
+            <h2>Explore</h2>
+            <p class="panel-copy">
+              Pan and zoom to any glacier region, switch emissions scenarios, then
+              hover or click a glacier to inspect extinction timing and metadata.
+              Point overview at low zoom, full polygons from zoom&nbsp;11.
+            </p>
+          </section>
+
+          <section>
+            <label for="scenario-select">Active scenario</label>
+            <select id="scenario-select" aria-label="Select emissions scenario"></select>
+            <p id="scenario-stats" class="microcopy"></p>
+          </section>
+
+          <section>
+            <h2>Glacier overlay</h2>
+            <label class="inline-toggle" for="overlay-visible-input">
+              <input id="overlay-visible-input" type="checkbox" checked />
+              <span>Show glacier layer</span>
+            </label>
+            <label for="overlay-opacity-input">Overlay opacity</label>
+            <div class="range-row">
+              <input id="overlay-opacity-input" type="range" min="15" max="100" value="75" />
+              <output id="overlay-opacity-value" for="overlay-opacity-input">75%</output>
+            </div>
+          </section>
+
+          <section id="search-section">
+            <label for="search-input">Find glacier</label>
+            <div class="search-box">
+              <input id="search-input" type="search" placeholder="Search by glacier name or RGI ID" autocomplete="off"
+                aria-autocomplete="list" aria-controls="search-results" />
+              <div id="search-results" class="search-results" hidden></div>
+            </div>
+            <p id="search-status" class="microcopy"></p>
+          </section>
+
+        </div>
+      </aside>
+    </div>
+
+    <aside class="legend-panel" id="legend-panel" aria-label="Legend">
+      <div class="legend-header">
+        <h2>Extinction year at: </h2>
+        <span id="active-scenario-chip" class="scenario-chip"></span>
       </div>
-
-      <div id="control-panel-body" class="control-panel-body">
-        <section>
-          <h2>Explore</h2>
-          <p class="panel-copy">
-            Pan and zoom to any glacier region, switch emissions scenarios, then
-            hover or click a glacier to inspect extinction timing and metadata.
-            Point overview at low zoom, full polygons from zoom&nbsp;11.
-          </p>
-        </section>
-
-        <section>
-          <label for="scenario-select">Active scenario</label>
-          <select id="scenario-select" aria-label="Select emissions scenario"></select>
-          <p id="scenario-stats" class="microcopy"></p>
-        </section>
-
-        <section>
-          <h2>Glacier overlay</h2>
-          <label class="inline-toggle" for="overlay-visible-input">
-            <input id="overlay-visible-input" type="checkbox" checked />
-            <span>Show glacier layer</span>
-          </label>
-          <label for="overlay-opacity-input">Overlay opacity</label>
-          <div class="range-row">
-            <input id="overlay-opacity-input" type="range" min="15" max="100" value="75" />
-            <output id="overlay-opacity-value" for="overlay-opacity-input">75%</output>
-          </div>
-        </section>
-
-        <section id="search-section">
-          <label for="search-input">Find glacier</label>
-          <div class="search-box">
-            <input id="search-input" type="search" placeholder="Search by glacier name or RGI ID" autocomplete="off"
-              aria-autocomplete="list" aria-controls="search-results" />
-            <div id="search-results" class="search-results" hidden></div>
-          </div>
-          <p id="search-status" class="microcopy"></p>
-        </section>
-
-        <section>
-          <div class="legend-header">
-            <h2>Legend</h2>
-            <span id="active-scenario-chip" class="scenario-chip"></span>
-          </div>
-          <div id="legend" class="legend"></div>
-        </section>
-      </div>
+      <div id="legend" class="legend"></div>
     </aside>
+
+    <button id="panel-launch-button" class="ghost-button compact-button" type="button" aria-controls="control-panel"
+      aria-label="Show controls" title="Show controls" hidden>
+      ☰
+    </button>
 
     <!-- Hover tooltip: positioned near cursor by JS -->
     <div id="hover-tooltip" hidden aria-hidden="true"></div>

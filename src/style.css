@@ -45,8 +45,7 @@ body {
     position: relative;
 }
 
-.app-header,
-.control-panel {
+.app-header {
     position: absolute;
     z-index: 900;
     backdrop-filter: blur(18px);
@@ -83,19 +82,35 @@ body {
     color: var(--accent);
 }
 
-.control-panel {
-    top: 94px;
+.left-sidebar-stack {
+    position: absolute;
+    z-index: 900;
+    top: 146px;
     left: 18px;
-    width: min(360px, calc(100vw - 36px));
-    max-height: calc(100vh - 120px);
-    overflow: auto;
+    width: min(320px, calc(100vw - 36px));
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.control-panel {
+    position: relative;
+    width: 100%;
+    height: auto;
+    max-height: calc(100vh - 164px);
+    overflow-x: hidden;
+    overflow-y: auto;
     padding: 14px;
     border-radius: var(--radius);
-    transition: width 180ms ease;
+    transition: opacity 140ms ease, transform 140ms ease;
+    backdrop-filter: blur(18px);
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    box-shadow: var(--shadow);
 }
 
 .control-panel.is-collapsed {
-    width: 188px;
+    display: none;
 }
 
 .control-panel-body {
@@ -111,6 +126,13 @@ body {
     align-items: center;
     justify-content: space-between;
     gap: 10px;
+    position: sticky;
+    top: -14px;
+    z-index: 2;
+    margin: -14px -14px 0;
+    padding: 14px;
+    background: linear-gradient(180deg, rgba(7, 15, 27, 0.98), rgba(9, 20, 34, 0.94));
+    border-bottom: 1px solid rgba(91, 140, 182, 0.16);
 }
 
 .panel-title {
@@ -200,6 +222,35 @@ button:hover {
     font-size: 0.9rem;
 }
 
+#panel-launch-button {
+    position: absolute;
+    top: 146px;
+    left: 18px;
+    z-index: 901;
+    width: 46px;
+    min-width: 46px;
+    height: 46px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    line-height: 1;
+    border-radius: 14px;
+    background: rgba(7, 15, 27, 0.96);
+    border: 1px solid rgba(108, 145, 182, 0.28);
+    box-shadow: 0 12px 28px rgba(1, 8, 16, 0.42);
+    opacity: 1;
+}
+
+#panel-launch-button[hidden] {
+    display: none;
+}
+
+#panel-launch-button:hover {
+    background: rgba(20, 40, 65, 0.98);
+}
+
 .search-box {
     position: relative;
 }
@@ -255,8 +306,34 @@ button:hover {
 .legend-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 8px;
+    justify-content: flex-start;
+    gap: 10px;
+}
+
+.legend-panel {
+    position: absolute;
+    left: 50%;
+    bottom: 18px;
+    transform: translateX(-50%);
+    z-index: 900;
+    width: min(372px, calc(100vw - 36px));
+    max-height: min(26vh, 230px);
+    overflow-y: auto;
+    padding: 14px 16px;
+    border-radius: var(--radius);
+    backdrop-filter: blur(18px);
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    box-shadow: var(--shadow);
+}
+
+.legend-panel h2 {
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+.legend-panel .legend-header {
+    margin-bottom: 10px;
 }
 
 .scenario-chip {
@@ -297,19 +374,24 @@ output {
 }
 
 .legend {
-    display: grid;
-    gap: 8px;
+    column-count: 2;
+    column-gap: 10px;
 }
 
 .legend-copy {
     margin-bottom: 6px;
+    break-inside: avoid;
 }
 
 .legend-item {
     display: flex;
     align-items: center;
-    gap: 10px;
-    font-size: 0.92rem;
+    gap: 8px;
+    font-size: 0.88rem;
+    min-width: 0;
+    break-inside: avoid;
+    margin-bottom: 8px;
+    white-space: nowrap;
 }
 
 .legend-swatch {
@@ -576,10 +658,38 @@ output {
         width: calc(100vw - 36px);
     }
 
+    .left-sidebar-stack {
+        top: auto;
+        left: 18px;
+        right: 18px;
+        width: auto;
+        bottom: 74px;
+        gap: 12px;
+    }
+
     .control-panel {
+        max-height: min(52vh, 480px);
+    }
+
+    .panel-toolbar {
+        top: -14px;
+    }
+
+    #panel-launch-button {
         top: auto;
         bottom: 18px;
-        max-height: min(52vh, 480px);
+    }
+
+    .legend-panel {
+        left: 18px;
+        right: 18px;
+        width: auto;
+        transform: none;
+        max-height: min(28vh, 260px);
+    }
+
+    .legend {
+        column-count: 1;
     }
 }
 

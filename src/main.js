@@ -79,6 +79,7 @@ const resetViewButton = document.querySelector("#reset-view-button");
 const bboxZoomButton = document.querySelector("#bbox-zoom-button");
 const terrainButton = document.querySelector("#terrain-button");
 const panelToggleButton = document.querySelector("#panel-toggle-button");
+const panelLaunchButton = document.querySelector("#panel-launch-button");
 const controlPanel = document.querySelector("#control-panel");
 const searchSection = document.querySelector("#search-section");
 const searchInput = document.querySelector("#search-input");
@@ -732,9 +733,6 @@ function updateLegend() {
         .join("");
 
     legendContainer.innerHTML = `
-    <p class="panel-copy legend-copy">
-      Earlier extinction years are shown with warmer colors. Later extinction years fade cooler and lighter.
-    </p>
     <div class="legend-item">
       <span class="legend-swatch" style="background:${YEAR_STYLE.alreadyExtinct}"></span>
       <span>Already extinct</span>
@@ -927,10 +925,24 @@ function zoomToSearchResult(item) {
 // ---------------------------------------------------------------------------
 
 function initPanelToggle() {
-    panelToggleButton.addEventListener("click", () => {
-        const collapsed = controlPanel.classList.toggle("is-collapsed");
-        panelToggleButton.textContent = collapsed ? "Expand" : "Collapse";
+    function syncPanelState(collapsed) {
+        controlPanel.classList.toggle("is-collapsed", collapsed);
+        panelToggleButton.textContent = "Collapse";
         panelToggleButton.setAttribute("aria-expanded", String(!collapsed));
+        panelToggleButton.setAttribute("aria-label", "Collapse controls");
+        panelToggleButton.title = "Collapse controls";
+        panelLaunchButton.hidden = !collapsed;
+        panelLaunchButton.setAttribute("aria-expanded", String(!collapsed));
+    }
+
+    syncPanelState(controlPanel.classList.contains("is-collapsed"));
+
+    panelToggleButton.addEventListener("click", () => {
+        syncPanelState(true);
+    });
+
+    panelLaunchButton.addEventListener("click", () => {
+        syncPanelState(false);
     });
 }
 
@@ -1090,6 +1102,7 @@ async function bootstrap() {
 
     // Bbox zoom – draw a rectangle on the map canvas, then fitBounds to it
     const mapCanvas = map.getCanvas();
+    const mapCanvasContainer = map.getCanvasContainer();
     const mapContainer = map.getContainer();
     const bboxRect = document.createElement("div");
     bboxRect.id = "bbox-rect";
@@ -1107,6 +1120,8 @@ async function bootstrap() {
         bboxActive = false;
         bboxZoomButton.classList.remove("is-active");
         mapCanvas.style.cursor = "";
+        mapCanvasContainer.style.cursor = "";
+        mapContainer.style.cursor = "";
         map.dragPan.enable();
         bboxRect.hidden = true;
         bboxStart = null;
@@ -1118,6 +1133,8 @@ async function bootstrap() {
         bboxZoomButton.classList.add("is-active");
         map.dragPan.disable();
         mapCanvas.style.cursor = "crosshair";
+        mapCanvasContainer.style.cursor = "crosshair";
+        mapContainer.style.cursor = "crosshair";
     });
 
     mapContainer.addEventListener("mousedown", (e) => {
@@ -1132,6 +1149,9 @@ async function bootstrap() {
 
     window.addEventListener("mousemove", (e) => {
         if (!bboxActive || !bboxStart) return;
+        mapCanvas.style.cursor = "crosshair";
+        mapCanvasContainer.style.cursor = "crosshair";
+        mapContainer.style.cursor = "crosshair";
         const cur = toContainerXY(e);
         const x = Math.min(cur.x, bboxStart.x);
         const y = Math.min(cur.y, bboxStart.y);
