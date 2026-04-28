@@ -6,7 +6,7 @@
  * Set to a GitHub release tag like "data-v1" when hosting large assets via
  * GitHub Releases. Leave null to load from the local ./data directory.
  */
-export const RELEASE_TAG = null;
+export const RELEASE_TAG = "data-v1";
 
 /** GitHub repo used for release-hosted data assets. */
 export const RELEASE_REPO = "kvantricht/glacier-extinction-explorer";
