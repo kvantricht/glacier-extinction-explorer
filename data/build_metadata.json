@@ -1,0 +1,93 @@
+{
+  "scenarios": [
+    {
+      "code": "15",
+      "key": "all:15",
+      "label": "1.5°C warming",
+      "tileFields": {
+        "median": "ext_15",
+        "q1": "ext_15_q1",
+        "q3": "ext_15_q3"
+      },
+      "styleField": "ext_15"
+    },
+    {
+      "code": "20",
+      "key": "all:20",
+      "label": "2.0°C warming",
+      "tileFields": {
+        "median": "ext_20",
+        "q1": "ext_20_q1",
+        "q3": "ext_20_q3"
+      },
+      "styleField": "ext_20"
+    },
+    {
+      "code": "27",
+      "key": "all:27",
+      "label": "2.7°C warming",
+      "tileFields": {
+        "median": "ext_27",
+        "q1": "ext_27_q1",
+        "q3": "ext_27_q3"
+      },
+      "styleField": "ext_27"
+    },
+    {
+      "code": "40",
+      "key": "all:40",
+      "label": "4.0°C warming",
+      "tileFields": {
+        "median": "ext_40",
+        "q1": "ext_40_q1",
+        "q3": "ext_40_q3"
+      },
+      "styleField": "ext_40"
+    }
+  ],
+  "yearExtent": {
+    "min": 2027,
+    "max": 2099
+  },
+  "areaExtent": {
+    "min": 0.01,
+    "max": 7537.579
+  },
+  "logAreaExtent": {
+    "min": -4.605170185988091,
+    "max": 8.927656321909206
+  },
+  "defaultScenarioCode": "27",
+  "idField": "RGIId",
+  "nameField": "Name",
+  "searchFields": [
+    "name",
+    "rgi_id",
+    "glims_id"
+  ],
+  "surviveSentinel": 9999,
+  "extinctSentinel": -1,
+  "studyHorizon": 2100,
+  "currentYear": 2026,
+  "metadataFields": {
+    "Area": "Area (km²)",
+    "CenLat": "Centroid latitude",
+    "CenLon": "Centroid longitude",
+    "Glacier volume": "Glacier volume",
+    "GLIMSId": "GLIMS ID",
+    "Inventory year": "Inventory year",
+    "Name": "Name",
+    "RGIId": "RGI ID",
+    "Zmax": "Max elevation (m)",
+    "Zmin": "Min elevation (m)"
+  },
+  "metadataFieldOrder": [
+    "Area",
+    "Glacier volume",
+    "Zmin",
+    "Zmax",
+    "Inventory year",
+    "CenLat",
+    "CenLon"
+  ]
+}
