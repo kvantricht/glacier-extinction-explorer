@@ -663,12 +663,12 @@ output {
         left: 18px;
         right: 18px;
         width: auto;
-        bottom: 74px;
+        bottom: calc(18px + min(22vh, 184px) + 12px);
         gap: 12px;
     }
 
     .control-panel {
-        max-height: min(52vh, 480px);
+        max-height: calc(100vh - 18px - min(22vh, 184px) - 12px - 146px);
     }
 
     .panel-toolbar {
@@ -685,11 +685,27 @@ output {
         right: 18px;
         width: auto;
         transform: none;
-        max-height: min(28vh, 260px);
+        max-height: min(22vh, 184px);
     }
 
     .legend {
         column-count: 1;
+    }
+}
+
+@media (max-width: 840px) and (max-height: 760px) {
+    .left-sidebar-stack {
+        bottom: calc(18px + min(20vh, 160px) + 10px);
+    }
+
+    .control-panel {
+        max-height: calc(100vh - 18px - min(20vh, 160px) - 10px - 146px);
+    }
+
+    .legend-panel {
+        max-height: min(20vh, 160px);
+        padding-top: 12px;
+        padding-bottom: 12px;
     }
 }
 
