@@ -195,11 +195,19 @@ function buildRadiusExpression(logAreaExtent) {
     // Stop output values can themselves be expressions (area-based).
     return [
         "interpolate", ["linear"], ["zoom"],
-        0, ["interpolate", ["linear"], ["coalesce", ["get", "log_area"], lo], lo, 1, hi, 3],
-        4, ["interpolate", ["linear"], ["coalesce", ["get", "log_area"], lo], lo, 1.5, hi, 4],
-        7, ["interpolate", ["linear"], ["coalesce", ["get", "log_area"], lo], lo, 2, hi, 6],
-        10, ["interpolate", ["linear"], ["coalesce", ["get", "log_area"], lo], lo, 3, hi, 9],
+        0, ["interpolate", ["linear"], ["coalesce", ["get", "log_area"], lo], lo, 2, hi, 6],
+        4, ["interpolate", ["linear"], ["coalesce", ["get", "log_area"], lo], lo, 3, hi, 8],
+        7, ["interpolate", ["linear"], ["coalesce", ["get", "log_area"], lo], lo, 4, hi, 12],
+        10, ["interpolate", ["linear"], ["coalesce", ["get", "log_area"], lo], lo, 6, hi, 18],
     ];
+}
+
+function getPointFillOpacity() {
+    return Math.min(1, overlayOpacity + 0.08);
+}
+
+function getPointStrokeOpacity() {
+    return Math.min(0.7, overlayOpacity * 0.65 + 0.05);
 }
 
 // ---------------------------------------------------------------------------
@@ -254,12 +262,12 @@ function addGlacierLayers() {
         paint: {
             "circle-color": colorExpr,
             "circle-radius": radiusExpr,
-            "circle-opacity": overlayOpacity,
+            "circle-opacity": getPointFillOpacity(),
             "circle-stroke-width": [
                 "case",
                 ["boolean", ["feature-state", "hover"], false], 2.5,
                 ["boolean", ["feature-state", "selected"], false], 2.5,
-                1.4,
+                0.9,
             ],
             "circle-stroke-color": [
                 "case",
@@ -267,7 +275,7 @@ function addGlacierLayers() {
                 ["boolean", ["feature-state", "selected"], false], YEAR_STYLE.selected,
                 YEAR_STYLE.outline,
             ],
-            "circle-stroke-opacity": overlayOpacity,
+            "circle-stroke-opacity": getPointStrokeOpacity(),
         },
     });
 
@@ -328,8 +336,8 @@ function applyScenarioStyles() {
 function applyOpacityStyles() {
     if (!map.getLayer("glaciers-points")) return;
 
-    map.setPaintProperty("glaciers-points", "circle-opacity", overlayOpacity);
-    map.setPaintProperty("glaciers-points", "circle-stroke-opacity", overlayOpacity);
+    map.setPaintProperty("glaciers-points", "circle-opacity", getPointFillOpacity());
+    map.setPaintProperty("glaciers-points", "circle-stroke-opacity", getPointStrokeOpacity());
     map.setPaintProperty("glaciers-polygons-fill", "fill-opacity", overlayOpacity);
     map.setPaintProperty("glaciers-polygons-line", "line-opacity", overlayOpacity);
 }
@@ -463,27 +471,29 @@ function formatMetadataValue(key, value) {
     return escapeHtml(String(value));
 }
 
+function formatCoordinatePair(lat, lon) {
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return "";
+    const latLabel = `${formatNumber(Math.abs(lat), 2)}°${lat >= 0 ? "N" : "S"}`;
+    const lonLabel = `${formatNumber(Math.abs(lon), 2)}°${lon >= 0 ? "E" : "W"}`;
+    return `${latLabel}, ${lonLabel}`;
+}
+
 function buildScenarioTableHtml(props, activeScenario) {
     const rows = metadata.scenarios
         .map((s) => {
-            const stats = Object.entries(s.tileFields)
-                .map(([stat, field]) => {
-                    const encoded = props[field];
-                    const label = decodeYearLabel(encoded);
-                    const statLabel = stat === "median" ? "Median" : stat.toUpperCase();
-                    return `<span><strong>${statLabel}:</strong> ${escapeHtml(label)}</span>`;
-                })
-                .join("");
+            const field = s.tileFields.median ?? s.styleField;
+            const encoded = props[field];
+            const label = decodeYearLabel(encoded);
 
             return `<tr class="${s.key === activeScenario.key ? "active-row" : ""}">
         <th scope="row">${escapeHtml(s.label)}</th>
-        <td>${stats}</td>
+        <td>${escapeHtml(label)}</td>
       </tr>`;
         })
         .join("");
 
     return `<table class="popup-table">
-    <thead><tr><th>Scenario</th><th>Extinction years</th></tr></thead>
+    <thead><tr><th>Scenario</th><th>Median extinction year</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
 }
@@ -492,6 +502,7 @@ function buildMetadataTableHtml(props) {
     const fieldOrder = metadata.metadataFieldOrder ?? [];
     const fieldLabels = metadata.metadataFields ?? {};
     const rows = fieldOrder
+        .filter((f) => !["CenLat", "CenLon"].includes(f))
         .filter((f) => props[f] !== undefined && props[f] !== null)
         .map((f) => {
             const label = fieldLabels[f] ?? f;
@@ -511,10 +522,12 @@ function buildPopupHtml(props) {
     const activeScenario = getCurrentScenario();
     const title = props.Name || props.RGIId || props.GLIMSId || "Unnamed glacier";
     const activeEncoded = props[activeScenario.styleField];
+    const coordinatePair = formatCoordinatePair(props.CenLat, props.CenLon);
 
     return `<div class="popup-content">
     <p class="popup-kicker">Active styling scenario</p>
     <h3>${escapeHtml(title)}</h3>
+        ${coordinatePair ? `<p class="popup-note">${escapeHtml(coordinatePair)}</p>` : ""}
     <p class="popup-highlight">
       ${escapeHtml(activeScenario.label)}: <strong>${escapeHtml(decodeYearLabel(activeEncoded))}</strong>
     </p>
@@ -536,6 +549,73 @@ function showPopupAt(lngLat, props) {
         .setLngLat(lngLat)
         .setHTML(buildPopupHtml(props))
         .addTo(map);
+}
+
+function extendBounds(bounds, coords) {
+    if (!Array.isArray(coords)) return;
+    if (typeof coords[0] === "number" && typeof coords[1] === "number") {
+        bounds[0][0] = Math.min(bounds[0][0], coords[0]);
+        bounds[0][1] = Math.min(bounds[0][1], coords[1]);
+        bounds[1][0] = Math.max(bounds[1][0], coords[0]);
+        bounds[1][1] = Math.max(bounds[1][1], coords[1]);
+        return;
+    }
+    for (const child of coords) extendBounds(bounds, child);
+}
+
+function getFeatureBounds(feature) {
+    const geometry = feature?.geometry;
+    if (!geometry?.coordinates) return null;
+
+    const bounds = [
+        [Infinity, Infinity],
+        [-Infinity, -Infinity],
+    ];
+    extendBounds(bounds, geometry.coordinates);
+
+    if (!Number.isFinite(bounds[0][0])) return null;
+    return bounds;
+}
+
+function getBoundsCenter(bounds) {
+    return [
+        (bounds[0][0] + bounds[1][0]) / 2,
+        (bounds[0][1] + bounds[1][1]) / 2,
+    ];
+}
+
+function focusFeature(feature, fallbackLngLat, popupProps) {
+    const bounds = getFeatureBounds(feature);
+    const popupLngLat = bounds
+        ? getBoundsCenter(bounds)
+        : fallbackLngLat;
+
+    if (popupProps && popupLngLat) {
+        showPopupAt(popupLngLat, popupProps);
+    }
+
+    if (bounds) {
+        const [sw, ne] = bounds;
+        const isPointLike = Math.abs(sw[0] - ne[0]) < 1e-10 && Math.abs(sw[1] - ne[1]) < 1e-10;
+        if (!isPointLike) {
+            map.fitBounds(bounds, {
+                padding: { top: 40, right: 40, bottom: 240, left: 40 },
+                maxZoom: 14,
+                duration: 900,
+                offset: [0, 120],
+            });
+            return;
+        }
+    }
+
+    if (popupLngLat) {
+        map.flyTo({
+            center: popupLngLat,
+            zoom: Math.max(map.getZoom(), 13),
+            duration: 900,
+            offset: [0, 120],
+        });
+    }
 }
 
 activePopup.on("close", () => {
@@ -582,7 +662,7 @@ function wireClickLayer(layerId) {
 
         e.originalEvent.stopPropagation();
         const feature = e.features[0];
-        showPopupAt(e.lngLat, feature.properties);
+        focusFeature(feature, [e.lngLat.lng, e.lngLat.lat], feature.properties);
     });
 }
 
@@ -810,7 +890,7 @@ function zoomToSearchResult(item) {
     if (!Number.isFinite(item.lat) || !Number.isFinite(item.lon)) return;
 
     activePopup.remove();
-    map.flyTo({ center: [item.lon, item.lat], zoom: 13, duration: 900 });
+    map.flyTo({ center: [item.lon, item.lat], zoom: 13, duration: 900, offset: [0, 120] });
 
     map.once("idle", () => {
         // Try to find the rendered feature and open its popup
@@ -825,7 +905,7 @@ function zoomToSearchResult(item) {
             if (!map.getLayer(layerId)) continue;
             const features = map.queryRenderedFeatures(bbox, { layers: [layerId] });
             if (features.length > 0) {
-                showPopupAt([item.lon, item.lat], features[0].properties);
+                focusFeature(features[0], [item.lon, item.lat], features[0].properties);
                 return;
             }
         }
@@ -838,6 +918,7 @@ function zoomToSearchResult(item) {
         <p class="popup-note">Zoom in further for full detail.</p></div>`
             )
             .addTo(map);
+        map.flyTo({ center: [item.lon, item.lat], zoom: 13, duration: 900, offset: [0, 120] });
     });
 }
 
