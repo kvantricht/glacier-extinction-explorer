@@ -1008,11 +1008,11 @@ async function bootstrap() {
                 pitch: TERRAIN_ON_PITCH_DEGREES,
                 duration: TERRAIN_CAMERA_ANIMATION_MS,
             });
-            map.once("moveend", () => {
+            setTimeout(() => {
                 if (terrainEnabled) {
                     map.setTerrain({ source: "dem", exaggeration: 1.5 });
                 }
-            });
+            }, TERRAIN_CAMERA_ANIMATION_MS);
             terrainButton.classList.add("is-active");
         } else {
             // setTerrain(null) is synchronous – no tile loading, no async
