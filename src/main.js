@@ -63,6 +63,10 @@ const map = new maplibregl.Map({
     maxPitch: 70,
 });
 
+const TERRAIN_ON_PITCH_DEGREES = 42;
+const TERRAIN_OFF_PITCH_DEGREES = 0;
+const TERRAIN_CAMERA_ANIMATION_MS = 500;
+
 map.addControl(new maplibregl.NavigationControl({ showCompass: true, visualizePitch: true }), "top-right");
 
 // ---------------------------------------------------------------------------
@@ -991,24 +995,33 @@ async function bootstrap() {
     addGlacierSources();
     addGlacierLayers();
 
-    // Sky layer – only visible when terrain is pitched
-    map.addLayer({
-        id: "sky",
-        type: "sky",
-        paint: {
-            "sky-type": "atmosphere",
-            "sky-atmosphere-sun": [0, 90],
-            "sky-atmosphere-sun-intensity": 15,
-        },
-    });
-
     terrainButton.addEventListener("click", () => {
         terrainEnabled = !terrainEnabled;
+        map.stop();
+
         if (terrainEnabled) {
-            map.setTerrain({ source: "dem", exaggeration: 1.5 });
+            // Animate pitch in flat 2D first, then enable terrain once the
+            // camera has settled. Calling setTerrain() before or during a
+            // camera animation causes MapLibre to fire async DEM-altitude
+            // corrections that override the animation and shift the view.
+            map.easeTo({
+                pitch: TERRAIN_ON_PITCH_DEGREES,
+                duration: TERRAIN_CAMERA_ANIMATION_MS,
+            });
+            map.once("moveend", () => {
+                if (terrainEnabled) {
+                    map.setTerrain({ source: "dem", exaggeration: 1.5 });
+                }
+            });
             terrainButton.classList.add("is-active");
         } else {
+            // setTerrain(null) is synchronous – no tile loading, no async
+            // altitude correction, so we can disable immediately then un-tilt.
             map.setTerrain(null);
+            map.easeTo({
+                pitch: TERRAIN_OFF_PITCH_DEGREES,
+                duration: TERRAIN_CAMERA_ANIMATION_MS,
+            });
             terrainButton.classList.remove("is-active");
         }
     });
