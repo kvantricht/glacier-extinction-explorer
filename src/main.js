@@ -1009,9 +1009,11 @@ async function bootstrap() {
                 duration: TERRAIN_CAMERA_ANIMATION_MS,
             });
             setTimeout(() => {
-                if (terrainEnabled) {
-                    map.setTerrain({ source: "dem", exaggeration: 1.5 });
-                }
+                requestAnimationFrame(() => {
+                    if (terrainEnabled) {
+                        map.setTerrain({ source: "dem", exaggeration: 1.5 });
+                    }
+                });
             }, TERRAIN_CAMERA_ANIMATION_MS);
             terrainButton.classList.add("is-active");
         } else {
