@@ -24,6 +24,10 @@
         <p class="eyebrow">Interactive map</p>
         <h1>Global Glacier Extinction Explorer</h1>
       </div>
+      <button id="about-button" class="ghost-button compact-button about-button" type="button"
+        aria-haspopup="dialog" aria-controls="about-modal" title="About this map">
+        &#x2139;&#xFE0E; About
+      </button>
     </header>
 
     <div class="left-sidebar-stack" id="left-sidebar-stack">
@@ -45,9 +49,11 @@
           <section>
             <h2>Explore</h2>
             <p class="panel-copy">
-              Pan and zoom to any glacier region, switch emissions scenarios, then
-              hover or click a glacier to inspect extinction timing and metadata.
-              Point overview at low zoom, full polygons from zoom&nbsp;11.
+              Navigate the map to discover glaciers worldwide. Select a warming
+              scenario to see how projected extinction years shift under different
+              futures. Hover over a glacier for a quick summary, or click it to
+              explore its full profile — including area, elevation range, and
+              projected extinction timing across scenarios.
             </p>
           </section>
 
@@ -55,6 +61,16 @@
             <label for="scenario-select">Active scenario</label>
             <select id="scenario-select" aria-label="Select emissions scenario"></select>
             <p id="scenario-stats" class="microcopy"></p>
+          </section>
+
+          <section id="search-section">
+            <label for="search-input">Find glacier</label>
+            <div class="search-box">
+              <input id="search-input" type="search" placeholder="Search by glacier name or RGI ID" autocomplete="off"
+                aria-autocomplete="list" aria-controls="search-results" />
+              <div id="search-results" class="search-results" hidden></div>
+            </div>
+            <p id="search-status" class="microcopy"></p>
           </section>
 
           <section>
@@ -68,16 +84,6 @@
               <input id="overlay-opacity-input" type="range" min="15" max="100" value="75" />
               <output id="overlay-opacity-value" for="overlay-opacity-input">75%</output>
             </div>
-          </section>
-
-          <section id="search-section">
-            <label for="search-input">Find glacier</label>
-            <div class="search-box">
-              <input id="search-input" type="search" placeholder="Search by glacier name or RGI ID" autocomplete="off"
-                aria-autocomplete="list" aria-controls="search-results" />
-              <div id="search-results" class="search-results" hidden></div>
-            </div>
-            <p id="search-status" class="microcopy"></p>
           </section>
 
         </div>
@@ -115,6 +121,74 @@
   </div>
 
   <script type="module" src="./src/main.js"></script>
+
+  <!-- About modal -->
+  <dialog id="about-modal" class="about-modal" aria-labelledby="about-modal-title">
+    <div class="about-modal-inner">
+      <div class="about-modal-header">
+        <h2 id="about-modal-title">About this map</h2>
+        <button id="about-close" class="ghost-button compact-button" type="button" aria-label="Close">&#x2715;</button>
+      </div>
+      <div class="about-modal-body">
+        <p>
+          Glacier changes are traditionally quantified in terms of total (regional) mass and area loss, but such
+          metrics do not fully capture the disappearance of individual glaciers. Yet every glacier, no matter how
+          small, can matter. Beyond their contribution to sea-level rise or regional water resources, glaciers hold
+          important cultural, ecological, and societal value, often deeply rooted in local landscapes and
+          communities. In the context of the UN International Year of Glacier Preservation (2025), this study
+          therefore shifts the focus towards the fate of individual glaciers worldwide.
+        </p>
+        <p>
+          To assess glacier extinction, two complementary criteria are used. A glacier is considered disappeared
+          (extinct) when its area drops below 0.01&nbsp;km&sup2;, consistent with commonly used inventory
+          thresholds, or when its remaining volume falls below 1% of its initial value, indicating that only a
+          negligible ice body persists. To derive volume and area trajectories for each glacier, three global
+          glacier models (GloGEM, OGGM, PyGEM) are used, combined with multiple General Circulation Models and
+          emission scenarios corresponding to projected temperature increases of +1.5&deg;C, +2.0&deg;C,
+          +2.7&deg;C, and +4.0&deg;C. All trajectories are then combined to determine median extinction years, as
+          well as Q25 and Q75 ranges (i.e. the 25% and 75% probability intervals). These results are shown on
+          the map.
+        </p>
+        <p>
+          Extinction is defined relative to the initial glacier outlines from the Randolph Glacier Inventory
+          (RGI&nbsp;v6.0). Glacier fragmentation during retreat is not accounted for; all remaining ice within
+          the original glacier extent is treated as part of the same glacier.
+        </p>
+
+        <h3>Data sources</h3>
+        <ul class="about-sources">
+          <li>
+            <strong>Extinction projections:</strong>
+            Van Tricht, L., Zekollari, H., Huss, M. et al. Peak glacier extinction in the mid-twenty-first
+            century. <em>Nature Climate Change</em> 16, 143&ndash;147 (2026).
+            <a href="https://doi.org/10.1038/s41558-025-02513-9" target="_blank" rel="noopener noreferrer">
+              doi:10.1038/s41558-025-02513-9
+            </a>
+          </li>
+          <li>
+            <strong>Regional and glacier-specific results</strong> (including those shown here) are publicly
+            available on Zenodo:
+            <a href="https://doi.org/10.5281/zenodo.17371641" target="_blank" rel="noopener noreferrer">
+              doi:10.5281/zenodo.17371641
+            </a>
+          </li>
+          <li>
+            <strong>Glacier outlines:</strong> Randolph Glacier Inventory v6.0 (RGI Consortium).
+          </li>
+          <li>
+            <strong>Ice volume:</strong> consensus estimate from Farinotti et al. (2019) (km&sup3;).
+          </li>
+        </ul>
+      </div>
+    </div>
+  </dialog>
+
+  <script>
+    const aboutModal = document.getElementById("about-modal");
+    document.getElementById("about-button").addEventListener("click", () => aboutModal.showModal());
+    document.getElementById("about-close").addEventListener("click", () => aboutModal.close());
+    aboutModal.addEventListener("click", (e) => { if (e.target === aboutModal) aboutModal.close(); });
+  </script>
 </body>
 
 </html>

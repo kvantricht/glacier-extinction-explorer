@@ -51,7 +51,7 @@ const map = new maplibregl.Map({
                 ],
                 tileSize: 256,
                 attribution:
-                    "Tiles &copy; Esri, Maxar, Earthstar Geographics, and the GIS User Community",
+                    "Tiles &copy; Esri, Maxar, Earthstar Geographics, and the GIS User Community | Glacier data: <a href='https://doi.org/10.1038/s41558-025-02513-9' target='_blank' rel='noopener'>Van Tricht et al. (2026)</a>",
                 maxzoom: 19,
             },
         },

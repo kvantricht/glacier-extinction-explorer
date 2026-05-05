@@ -789,3 +789,108 @@ output {
     color: #4db0ff;
     box-shadow: 0 0 0 2px #0066cc;
 }
+
+/* --------------------------------------------------------------------------
+   App header: About button
+   -------------------------------------------------------------------------- */
+
+.app-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.about-button {
+    flex: 0 0 auto;
+    align-self: center;
+    white-space: nowrap;
+}
+
+/* --------------------------------------------------------------------------
+   About modal
+   -------------------------------------------------------------------------- */
+
+.about-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    width: min(680px, calc(100vw - 48px));
+    max-height: calc(100vh - 48px);
+    margin: auto;
+    padding: 0;
+    border: 1px solid var(--panel-border);
+    border-radius: var(--radius);
+    background: rgba(7, 15, 27, 0.97);
+    backdrop-filter: blur(24px);
+    box-shadow: 0 24px 60px rgba(1, 8, 16, 0.6);
+    color: var(--text);
+    overflow: hidden;
+}
+
+.about-modal::backdrop {
+    background: rgba(1, 8, 16, 0.65);
+    backdrop-filter: blur(4px);
+}
+
+.about-modal-inner {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 48px);
+}
+
+.about-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--panel-border);
+    position: sticky;
+    top: 0;
+    background: rgba(7, 15, 27, 0.98);
+}
+
+.about-modal-header h2 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+}
+
+.about-modal-body {
+    padding: 20px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    line-height: 1.65;
+}
+
+.about-modal-body p {
+    margin: 0 0 14px;
+    color: var(--muted);
+}
+
+.about-modal-body h3 {
+    margin: 20px 0 10px;
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+}
+
+.about-sources {
+    margin: 0;
+    padding-left: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    color: var(--muted);
+}
+
+.about-sources a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.about-sources a:hover {
+    text-decoration: underline;
+}
