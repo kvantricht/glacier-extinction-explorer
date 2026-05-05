@@ -2,7 +2,7 @@
 
 A browser-based interactive map for exploring glacier extinction projections worldwide. Pan and zoom across ~200 000 glaciers, switch between warming scenarios, and click any glacier to inspect its projected extinction year and physical attributes.
 
-Built with **MapLibre GL JS** and **PMTiles** — no backend or tile server required. The browser streams only the tiles it needs for the current view.
+Built with **MapLibre GL JS** and **PMTiles**.
 
 ---
 
