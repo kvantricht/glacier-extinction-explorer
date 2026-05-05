@@ -6,6 +6,25 @@ Built with **MapLibre GL JS** and **PMTiles** — no backend or tile server requ
 
 ---
 
+## Background
+
+Glacier changes are traditionally quantified in terms of total (regional) mass and area loss, but such metrics do not fully capture the disappearance of individual glaciers. Yet every glacier, no matter how small, can matter. Beyond their contribution to sea-level rise or regional water resources, glaciers hold important cultural, ecological, and societal value, often deeply rooted in local landscapes and communities. In the context of the UN International Year of Glacier Preservation (2025), this study therefore shifts the focus towards the fate of individual glaciers worldwide.
+
+To assess glacier extinction, two complementary criteria are used. A glacier is considered disappeared (extinct) when its area drops below 0.01 km², consistent with commonly used inventory thresholds, or when its remaining volume falls below 1% of its initial value, indicating that only a negligible ice body persists. To derive volume and area trajectories for each glacier, three global glacier models (GloGEM, OGGM, PyGEM) are used, combined with multiple General Circulation Models and emission scenarios corresponding to projected temperature increases of +1.5°C, +2.0°C, +2.7°C, and +4.0°C. All trajectories are then combined to determine median extinction years, as well as Q25 and Q75 ranges (i.e. the 25% and 75% probability intervals). These results are shown on the map.
+
+It is important to note that extinction is defined relative to the initial glacier outlines from the Randolph Glacier Inventory (RGI v6.0). As such, glacier fragmentation during retreat is not accounted for, which could temporarily increase the number of individual glacier entities. Instead, all remaining ice within the original glacier extent is treated as part of the same glacier.
+
+---
+
+## Data sources
+
+- **Extinction projections** — Van Tricht, L., Zekollari, H., Huss, M. et al. Peak glacier extinction in the mid-twenty-first century. *Nature Climate Change* 16, 143–147 (2026). <https://doi.org/10.1038/s41558-025-02513-9>
+- **Regional and glacier-specific results** (including those shown here) are publicly available on Zenodo: <https://doi.org/10.5281/zenodo.17371641>
+- **Glacier outlines** — Randolph Glacier Inventory v6.0 (RGI Consortium)
+- **Ice volume** — Farinotti et al. (2019) consensus estimate (km³)
+
+---
+
 ## Features
 
 - **Global coverage** — all ~200 000 glaciers from the Randolph Glacier Inventory (RGI)
