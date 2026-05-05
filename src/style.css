@@ -894,3 +894,16 @@ output {
 .about-sources a:hover {
     text-decoration: underline;
 }
+
+.about-modal-footer {
+    padding: 12px 20px;
+    border-top: 1px solid var(--panel-border);
+    display: flex;
+    justify-content: flex-end;
+}
+
+.about-version {
+    font-size: 0.8rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+}

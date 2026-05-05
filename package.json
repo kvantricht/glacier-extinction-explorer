@@ -1,0 +1,12 @@
+{
+  "name": "glacier-extinction-explorer",
+  "version": "1.0.0",
+  "description": "Browser-based interactive map for exploring glacier extinction projections worldwide.",
+  "homepage": "https://kvantricht.github.io/glacier-extinction-explorer/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kvantricht/glacier-extinction-explorer"
+  },
+  "license": "MIT",
+  "private": true
+}

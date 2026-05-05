@@ -22,6 +22,7 @@ import {
     SEARCH_INDEX_URL,
     STUDY_HORIZON_YEAR,
     SURVIVES_SENTINEL,
+    VERSION_URL,
     YEAR_STYLE,
     escapeHtml,
     formatNumber,
@@ -959,10 +960,11 @@ function initPanelToggle() {
 async function bootstrap() {
     setStatus("Loading glacier data…");
 
-    // Load metadata and search index in parallel
-    const [metaRes, searchRes] = await Promise.all([
+    // Load metadata, search index, and package version in parallel
+    const [metaRes, searchRes, versionRes] = await Promise.all([
         fetch(BUILD_METADATA_URL),
         fetch(SEARCH_INDEX_URL),
+        fetch(VERSION_URL),
     ]);
 
     if (!metaRes.ok) throw new Error(`Failed to load build metadata (${metaRes.status}). Run scripts/build_pmtiles.py first.`);
@@ -970,6 +972,13 @@ async function bootstrap() {
 
     metadata = await metaRes.json();
     searchIndex = await searchRes.json();
+
+    // Inject version into About modal
+    if (versionRes.ok) {
+        const pkg = await versionRes.json();
+        const versionEl = document.getElementById("app-version");
+        if (versionEl && pkg.version) versionEl.textContent = `v${pkg.version}`;
+    }
 
     // Populate scenario selector
     for (const scenario of metadata.scenarios) {
