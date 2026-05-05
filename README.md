@@ -1,201 +1,147 @@
 # Global Glacier Extinction Explorer
 
-A browser-based interactive map for exploring glacier extinction projections worldwide, built with **MapLibre GL JS** and backed by **PMTiles** vector tiles.
+A browser-based interactive map for exploring glacier extinction projections worldwide. Pan and zoom across ~200 000 glaciers, switch between warming scenarios, and click any glacier to inspect its projected extinction year and physical attributes.
 
-Scalable to ~200 000 glaciers: the browser streams only the tiles needed for the current map view rather than loading a monolithic GeoJSON file.
-
----
-
-## Architecture overview
-
-```
-global_glaciers.parquet          ← canonical source-of-truth (external, not in repo)
-         │
-         ▼
-scripts/build_pmtiles.py         ← preprocessing pipeline (Python)
-         │
-         ├── data/glaciers_points.pmtiles    ← overview points, z0–z10
-         ├── data/glaciers_polygons.pmtiles  ← detailed polygons, z10–z16
-         ├── data/search_index.json          ← lightweight typeahead index
-         └── data/build_metadata.json        ← scenario defs, extents, field names
-                  │
-                  ▼
-         index.html + src/       ← MapLibre GL JS frontend (pure static files)
-```
-
-The **GeoParquet** is the single source of truth.  Generated artifacts (`*.pmtiles`, `search_index.json`, `build_metadata.json`) are **build outputs** – they are `.gitignore`d and should be hosted separately (e.g. on object storage, a CDN, or a local server) rather than committed to the repo.
+Built with **MapLibre GL JS** and **PMTiles** — no backend or tile server required. The browser streams only the tiles it needs for the current view.
 
 ---
 
-## Source-of-truth: GeoParquet schema
+## Features
 
-The pipeline expects a GeoParquet file with at least:
-
-| Column | Type | Description |
-|---|---|---|
-| geometry | WKB / GeoArrow | Glacier polygon or multipolygon (any CRS; reprojected to WGS-84 automatically) |
-| `RGIId` | string | Stable RGI glacier ID (used as tile feature ID) |
-| `GLIMSId` | string | GLIMS ID |
-| `Name` | string | Display name |
-| `Area` | float | Glacier area in km² |
-| `CenLat`, `CenLon` | float | Centroid (fallback display point) |
-| `Extinction_{family}_{stat}_{code}` | float / int | Per-scenario extinction year fields, e.g. `Extinction_SSP_median_26` |
-
-Additional attribute columns (`Zmin`, `Zmed`, `Zmax`, `Slope`, `Status`, …) are passed through to tile attributes and shown in popups.
-
-### Extinction-year encoding
-
-The build script normalises all extinction-year values into an integer sentinel scheme used inside the vector tiles:
-
-| Raw value | Tile encoding | Meaning |
-|---|---|---|
-| `null`, `NaN`, `""` | `9999` | No data → treated as "survives through 2100" |
-| `>= 2100` or `>= 9000` | `9999` | Projected survival beyond study horizon |
-| `< 1850` | `9999` | Implausible value → treated as survives |
-| `< current year` | `-1` | Already extinct |
-| `2026–2099` | year as-is | Future projected extinction |
+- **Global coverage** — all ~200 000 glaciers from the Randolph Glacier Inventory (RGI)
+- **Multiple warming scenarios** — switch between SSP/temperature targets to see how projections change
+- **Per-glacier detail** — hover for a quick tooltip; click for full metadata (area, elevation range, slope, extinction year)
+- **Search** — find any glacier by name or RGI ID
+- **3D terrain** — toggle a terrain mode for mountainous regions
+- **Satellite basemap** — Esri World Imagery base layer
 
 ---
 
-## Preprocessing: generating build artifacts
+## Running locally
 
-### Requirements
-
-```bash
-pip install geopandas pyarrow shapely numpy pyogrio
-```
-
-**`ogr2ogr`** (GDAL) must be on PATH. It ships with GDAL, which is a geopandas dependency:
-
-```bash
-# conda – already available
-conda install geopandas
-
-# Ubuntu / Debian
-sudo apt-get install gdal-bin
-
-# Windows – use OSGeo4W installer: https://trac.osgeo.org/osgeo4w/
-# or install via conda (recommended)
-```
-
-**`pmtiles`** CLI must be on PATH – a single Go binary, no compilation required:
-
-```bash
-# Download the binary for your platform from:
-# https://github.com/protomaps/go-pmtiles/releases
-# Extract and place on PATH (or in the repo root).
-
-# macOS (Homebrew)
-brew install protomaps/go-pmtiles/go-pmtiles
-
-# Linux (download release binary)
-curl -L https://github.com/protomaps/go-pmtiles/releases/latest/download/go-pmtiles_Linux_x86_64.tar.gz | tar xz
-sudo mv pmtiles /usr/local/bin/
-```
-
-### Run the build
-
-```bash
-# Default: reads from the canonical path, writes to ./data/
-python scripts/build_pmtiles.py
-
-# Explicit paths
-python scripts/build_pmtiles.py /path/to/global_glaciers.parquet --out ./data
-```
-
-The script:
-1. Reads the GeoParquet and reprojects to WGS-84 if needed
-2. Normalises extinction years to integer sentinels
-3. Writes **FlatGeobuf** intermediates to a temp directory (compact binary, ~10× smaller than GeoJSON)
-4. Runs `ogr2ogr` (GDAL MVT driver) to generate z/x/y tile directory trees
-5. Runs `pmtiles convert` to package each tile directory into a PMTiles archive
-6. Cleans up all temp files automatically
-7. Writes `search_index.json` and `build_metadata.json` to `data/`
-
-After a successful run `data/` will contain only the final artifacts:
-
-```
-data/
-  glaciers_points.pmtiles      ← loaded by the browser at zoom 0–10
-  glaciers_polygons.pmtiles    ← loaded by the browser at zoom 11–16
-  search_index.json            ← typeahead search index
-  build_metadata.json          ← scenario definitions and extents
-```
-
-### Hosting assumptions
-
-The four generated files in `data/` must be served over HTTP with CORS headers that allow the browser to read them.  Options:
-
-- **Local dev**: a static file server in this directory (see below).
-- **Cloud storage**: upload to S3 / Azure Blob / GCS with public read and permissive CORS, then point `POINTS_PMTILES_URL` / `POLYGONS_PMTILES_URL` / etc. in `src/config.js` to the public URLs.
-- **CDN-fronted object storage**: same as above, ideal for production.
-- **Static hosting (Netlify, GitHub Pages, Vercel)**: commit only the generated `data/` files to a deployment branch or upload them as release assets.
-
-PMTiles are self-contained archives; the browser fetches only the tile chunks it needs via HTTP range requests.  No tile server process is required.
-
----
-
-## Local development
-
-Serve the repo root over HTTP (any static server works):
+The app is a set of static files. Any HTTP server works — you cannot open `index.html` directly as a `file://` URL because the app uses ES modules.
 
 ```bash
 # Python
 python -m http.server 8080
 
-# Node (npx)
+# Node.js
 npx serve .
 
-# Or use the included helper (Windows)
+# Windows helper included in the repo
 run-local.cmd
 ```
 
 Then open [http://localhost:8080](http://localhost:8080).
 
-> **Note:** The app uses ES modules (`type="module"`), so it must be served over HTTP – opening `index.html` directly as a `file://` URL will not work.
+The tile data (`*.pmtiles`) is served from Cloudflare R2 by default, so no local data setup is needed just to view the map.
 
 ---
 
-## Frontend overview
+## Building the tile data
 
-| File | Role |
-|---|---|
-| `index.html` | App shell, CDN imports for MapLibre GL JS and PMTiles |
-| `src/config.js` | Asset URLs, sentinel constants, color ramp, helpers |
-| `src/main.js` | Map init, PMTiles sources, layer styling, interactions, search |
-| `src/style.css` | Dark-themed UI, MapLibre popup/control overrides, hover tooltip |
+If you want to run the full pipeline from source data (e.g. to update glacier projections), you will need the source GeoParquet file and a few command-line tools.
 
-### Layer strategy
+### Prerequisites
 
-| Zoom | Layer shown | Source |
+**Python packages:**
+
+```bash
+pip install geopandas pyarrow shapely numpy pyogrio
+```
+
+**`ogr2ogr`** (GDAL) must be on `PATH`:
+
+```bash
+# conda (recommended on Windows/macOS)
+conda install geopandas   # brings GDAL with it
+
+# Ubuntu / Debian
+sudo apt-get install gdal-bin
+```
+
+**`pmtiles`** CLI — a single binary, no compilation needed:
+
+```bash
+# macOS (Homebrew)
+brew install protomaps/go-pmtiles/go-pmtiles
+
+# Linux
+curl -L https://github.com/protomaps/go-pmtiles/releases/latest/download/go-pmtiles_Linux_x86_64.tar.gz | tar xz
+sudo mv pmtiles /usr/local/bin/
+
+# Windows — download from https://github.com/protomaps/go-pmtiles/releases and place on PATH
+```
+
+### Run the build
+
+```bash
+# Default source path
+python scripts/build_pmtiles.py
+
+# Explicit input/output paths
+python scripts/build_pmtiles.py /path/to/global_glaciers.parquet --out ./data
+```
+
+This produces four files in `data/`:
+
+```
+data/
+  glaciers_points.pmtiles      ← overview point layer (zoom 0–10)
+  glaciers_polygons.pmtiles    ← full polygon layer (zoom 11+)
+  search_index.json            ← typeahead search index
+  build_metadata.json          ← scenario definitions and year extents
+```
+
+### Expected input schema
+
+The pipeline expects a GeoParquet file with at least the following columns:
+
+| Column | Type | Description |
 |---|---|---|
-| 0–10 | `glaciers-points` (circles) | `glaciers_points.pmtiles` |
-| 11–16 | `glaciers-polygons-fill` + `glaciers-polygons-line` | `glaciers_polygons.pmtiles` |
+| `geometry` | polygon / multipolygon | Glacier outline (any CRS; reprojected automatically) |
+| `RGIId` | string | Stable RGI glacier ID |
+| `GLIMSId` | string | GLIMS ID |
+| `Name` | string | Display name |
+| `Area` | float | Glacier area in km² |
+| `CenLat`, `CenLon` | float | Centroid coordinates |
+| `Extinction_{family}_{stat}_{code}` | float / int | Per-scenario projected extinction year (e.g. `Extinction_SSP_median_26`) |
 
-Point size scales logarithmically with glacier area.  Larger glaciers are rendered above smaller ones (`circle-sort-key`).  At low zoom, tippecanoe drops smaller glaciers first to keep tile sizes manageable.
+Additional attribute columns (`Zmin`, `Zmed`, `Zmax`, `Slope`, `Status`, …) are passed through and shown in the detail popup.
 
-### Styling
+### Hosting the tile files
 
-Colors are computed from MapLibre GL data-driven expressions at render time:
+The four generated files must be accessible over HTTP with CORS enabled. Options:
 
-- **Already extinct** (`-1`): dark red `#7f0000`
-- **Survives through 2100** (`9999` / missing): blue `#5aa9d6`  
-- **Future extinction year**: continuous 6-stop ramp from warm red (earliest) to cool blue (latest), interpolated across the observed year range
+- **Local dev** — the static server described above serves them automatically.
+- **Cloud storage** — upload to S3, Azure Blob, GCS, or Cloudflare R2 with public read access and a permissive CORS policy, then update `PMTILES_BASE_URL` in `src/config.js`.
+- **Static hosting** — Netlify, GitHub Pages, Vercel, etc. (commit or deploy the `data/` directory).
 
-Switching scenarios calls `map.setPaintProperty` – no layer rebuild needed.
-
-### Search
-
-The `search_index.json` is loaded once at startup.  Typeahead search uses substring matching across name, RGI ID, and GLIMS ID fields, ranked by match position.  Selecting a result calls `map.flyTo` and then queries rendered features to open a full popup.
+PMTiles archives support HTTP range requests, so the browser only downloads the chunks it needs — no tile server process is required.
 
 ---
 
-## Updating with new glacier data
+## Updating with new data
 
-1. Replace / update the source GeoParquet.
+1. Update or replace the source GeoParquet file.
 2. Re-run `python scripts/build_pmtiles.py`.
-3. Upload the new `data/*.pmtiles`, `data/search_index.json`, and `data/build_metadata.json` to your hosting location.
-4. No changes to the frontend HTML/JS/CSS are needed unless the schema or scenario naming convention changes.
+3. Upload the new `data/` files to your hosting location.
+4. No changes to the frontend are needed unless the column naming convention changes.
+
+---
+
+## Project structure
+
+```
+index.html          ← app entry point
+src/
+  config.js         ← asset URLs, color scheme, scenario helpers
+  main.js           ← map initialisation, layer logic, search, interactions
+  style.css         ← UI styles
+scripts/
+  build_pmtiles.py  ← data pipeline: GeoParquet → PMTiles + JSON indexes
+data/               ← generated tile files (not committed to the repo)
+```
 
 ---
 
