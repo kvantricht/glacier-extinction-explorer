@@ -173,3 +173,18 @@ data/               ← generated tile files (not committed to the repo)
 | `scripts/build_pmtiles.py` | Main preprocessing pipeline |
 | `scripts/build_geojson.py` | Legacy Swiss-glacier GeoJSON builder (kept for reference) |
 | `scripts/inspect_parquet_metadata.py` | Inspect GeoParquet schema without modifying data |
+
+---
+
+## Acknowledgements
+
+This project is built on the following open-source software:
+
+- **[MapLibre GL JS](https://maplibre.org/)** — interactive map rendering in the browser
+- **[PMTiles](https://protomaps.com/docs/pmtiles)** — cloud-optimised vector tile archive format enabling range-request streaming without a tile server
+- **[GeoPandas](https://geopandas.org/)** — geospatial data processing in Python
+- **[NumPy](https://numpy.org/)** — numerical operations in the data pipeline
+- **[GDAL / ogr2ogr](https://gdal.org/)** — vector tile generation from FlatGeobuf intermediates
+- **[go-pmtiles](https://github.com/protomaps/go-pmtiles)** — CLI tool for converting MBTiles archives to the PMTiles format
+
+The web application was developed with the assistance of **Claude Sonnet 4.6** (Anthropic), which laid the foundation for the frontend code and data pipeline structure.
