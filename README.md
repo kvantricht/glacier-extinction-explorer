@@ -1,5 +1,7 @@
 # Global Glacier Extinction Explorer
 
+**[https://kvantricht.github.io/glacier-extinction-explorer/](https://kvantricht.github.io/glacier-extinction-explorer/)**
+
 A browser-based interactive map for exploring glacier extinction projections worldwide. Pan and zoom across ~200 000 glaciers, switch between warming scenarios, and click any glacier to inspect its projected extinction year and physical attributes.
 
 Built with **MapLibre GL JS** and **PMTiles**.
