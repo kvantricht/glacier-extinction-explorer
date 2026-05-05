@@ -886,12 +886,12 @@ output {
     color: var(--muted);
 }
 
-.about-sources a {
+.about-modal-body a {
     color: var(--accent);
     text-decoration: none;
 }
 
-.about-sources a:hover {
+.about-modal-body a:hover {
     text-decoration: underline;
 }
 
