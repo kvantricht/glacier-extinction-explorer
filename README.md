@@ -2,8 +2,6 @@
 
 A browser-based interactive map for exploring glacier extinction projections worldwide, built with **MapLibre GL JS** and backed by **PMTiles** vector tiles.
 
-Scalable to ~200 000 glaciers: the browser streams only the tiles needed for the current map view rather than loading a monolithic GeoJSON file.
-
 ---
 
 ## Architecture overview
