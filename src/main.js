@@ -29,11 +29,29 @@ import {
 } from "./config.js";
 
 // ---------------------------------------------------------------------------
-// PMTiles protocol registration
+// PMTiles protocol registration (with retry on network error)
 // ---------------------------------------------------------------------------
 
 const protocol = new pmtiles.Protocol();
-maplibregl.addProtocol("pmtiles", protocol.tile);
+
+const MAX_TILE_RETRIES = 3;
+const TILE_RETRY_BASE_MS = 1000;
+
+function tileWithRetry(params, abortController) {
+    const attempt = (retriesLeft, delay) =>
+        protocol.tile(params, abortController).catch((err) => {
+            // Only retry on network-level failures (ERR_TIMED_OUT, ERR_NETWORK_CHANGED, etc.)
+            // Do not retry if the request was intentionally aborted.
+            if (retriesLeft <= 0 || abortController?.signal?.aborted) throw err;
+            if (!(err instanceof TypeError)) throw err;
+            return new Promise((resolve, reject) => {
+                setTimeout(() => attempt(retriesLeft - 1, delay * 2).then(resolve, reject), delay);
+            });
+        });
+    return attempt(MAX_TILE_RETRIES, TILE_RETRY_BASE_MS);
+}
+
+maplibregl.addProtocol("pmtiles", tileWithRetry);
 
 // ---------------------------------------------------------------------------
 // Map initialisation
@@ -76,6 +94,9 @@ map.addControl(new maplibregl.NavigationControl({ showCompass: true, visualizePi
 
 const statusBox = document.querySelector("#status-box");
 const statusMessage = document.querySelector("#status-message");
+const statusDismiss = document.querySelector("#status-dismiss");
+
+statusDismiss.addEventListener("click", clearStatus);
 const scenarioSelect = document.querySelector("#scenario-select");
 const scenarioStats = document.querySelector("#scenario-stats");
 const legendContainer = document.querySelector("#legend");
@@ -122,12 +143,14 @@ function setStatus(message, tone = "loading") {
     statusBox.hidden = false;
     statusMessage.textContent = message;
     statusBox.dataset.tone = tone;
+    statusDismiss.hidden = tone !== "error";
 }
 
 function clearStatus() {
     statusBox.hidden = true;
     statusMessage.textContent = "";
     delete statusBox.dataset.tone;
+    statusDismiss.hidden = true;
 }
 
 // ---------------------------------------------------------------------------
@@ -1088,8 +1111,14 @@ async function bootstrap() {
     // Wait for the tile sources to be ready, then clear the loading overlay
     // We wait for the 'idle' event which fires once all pending tile loads complete.
     map.once("idle", clearStatus);
-    // Fallback: clear after 8 s even if tiles are slow
-    setTimeout(clearStatus, 8000);
+
+    // If a tile source fails to load (e.g. network timeout after retries),
+    // show an error message instead of silently clearing the overlay.
+    map.once("error", (e) => {
+        // Ignore errors that fire after the overlay was already dismissed.
+        if (statusBox.hidden) return;
+        setStatus("Some map data failed to load. Check your connection and reload the page.", "error");
+    });
 
     // Fit map to initial bounds from metadata (if available), else world view
     if (metadata.initialBounds) {
