@@ -656,23 +656,38 @@ output {
    -------------------------------------------------------------------------- */
 
 .maplibregl-ctrl-group {
+    background: rgb(9, 20, 34) !important;
     box-shadow: 0 12px 24px rgba(2, 10, 20, 0.3) !important;
     border-radius: 12px !important;
     overflow: hidden;
     border: 1px solid rgba(91, 140, 182, 0.22) !important;
+    backdrop-filter: blur(18px);
 }
 
 .maplibregl-ctrl-group button {
-    background-color: rgba(10, 21, 37, 0.88) !important;
+    background: rgb(9, 20, 34) !important;
     color: var(--text) !important;
     border: 0 !important;
+    border-bottom: 1px solid rgba(91, 140, 182, 0.14) !important;
     border-radius: 0 !important;
     transform: none !important;
+    padding: 0 !important;
+}
+
+.maplibregl-ctrl-group button:last-child {
+    border-bottom: 0 !important;
 }
 
 .maplibregl-ctrl-group button:hover {
-    background-color: rgba(20, 40, 65, 0.96) !important;
+    background: rgba(20, 40, 65, 0.96) !important;
     opacity: 1 !important;
+    transform: none !important;
+}
+
+/* Override blue focus ring from MapLibre default stylesheet */
+.maplibregl-ctrl-group button:focus,
+.maplibregl-ctrl-group button:focus:focus-visible {
+    box-shadow: 0 0 2px 2px rgba(77, 176, 255, 0.6) !important;
 }
 
 .maplibregl-ctrl-icon {
@@ -685,13 +700,15 @@ output {
 
 @media (max-width: 840px) {
     .app-header {
-        width: calc(100vw - 36px);
+        /* Leave ~52px on the right for MapLibre nav controls (10px margin + 29px wide + 13px gap) */
+        width: calc(100vw - 70px);
     }
 
     .left-sidebar-stack {
         top: auto;
         left: 18px;
-        right: 18px;
+        /* 10px margin + 29px nav ctrl width + 9px gap = 48px — keeps clear of bbox/terrain buttons */
+        right: 48px;
         width: auto;
         bottom: calc(18px + min(22vh, 184px) + 12px);
         gap: 12px;
@@ -712,7 +729,7 @@ output {
 
     .legend-panel {
         left: 18px;
-        right: 18px;
+        right: 48px;
         width: auto;
         transform: none;
         max-height: min(22vh, 184px);
@@ -720,6 +737,24 @@ output {
 
     .legend {
         column-count: 1;
+    }
+
+    /* When attribution is expanded, lift the bottom-right container above the legend */
+    .maplibregl-ctrl-bottom-right:has(.maplibregl-compact-show) {
+        bottom: calc(min(22vh, 184px) + 28px) !important;
+    }
+
+    /* Popup: constrain width and height on small screens */
+    .maplibregl-popup {
+        max-width: calc(100vw - 24px) !important;
+    }
+
+    .maplibregl-popup-content {
+        max-width: 100% !important;
+    }
+
+    .popup-content {
+        max-height: min(44vh, 280px);
     }
 
 }
@@ -738,6 +773,14 @@ output {
         padding-top: 12px;
         padding-bottom: 12px;
     }
+
+    .maplibregl-ctrl-bottom-right:has(.maplibregl-compact-show) {
+        bottom: calc(min(20vh, 160px) + 28px) !important;
+    }
+
+    .popup-content {
+        max-height: min(36vh, 200px);
+    }
 }
 
 /* ---------------------------------------------------------------------------
@@ -752,11 +795,12 @@ output {
     z-index: 10;
 }
 
-/* Bbox-zoom button: sits inside #map (position relative), aligned to match
-   MapLibre's top-right control group. NavigationControl (zoom +/- + compass) is ~87px tall. */
+/* Bbox-zoom button: sits inside #map (position relative), aligned below
+   MapLibre's top-right NavigationControl group (10px margin + 3×29px buttons + 2px borders ≈ 99px).
+   A 10px gap avoids overlap. */
 #bbox-zoom-button {
     position: absolute;
-    top: 97px;
+    top: 110px;
     right: 10px;
     z-index: 2;
     width: 29px;
@@ -787,7 +831,7 @@ output {
 
 #terrain-button {
     position: absolute;
-    top: 136px;
+    top: 149px;
     right: 10px;
     z-index: 2;
     width: 29px;

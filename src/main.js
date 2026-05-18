@@ -59,6 +59,7 @@ maplibregl.addProtocol("pmtiles", tileWithRetry);
 
 const map = new maplibregl.Map({
     container: "map",
+    attributionControl: { compact: true },
     style: {
         version: 8,
         glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
@@ -465,19 +466,28 @@ function showTooltip(x, y, props) {
 
 function positionTooltip(x, y) {
     const tt = hoverTooltip;
-    const mapEl = document.querySelector("#map");
-    const mapRect = mapEl.getBoundingClientRect();
     const ttRect = tt.getBoundingClientRect();
 
     let left = x + 16;
     let top = y - 10;
 
-    if (left + ttRect.width > mapRect.right - mapRect.left) {
+    // Clamp right edge against viewport
+    if (left + ttRect.width > window.innerWidth - 8) {
         left = x - ttRect.width - 16;
     }
-    if (top + ttRect.height > mapRect.bottom - mapRect.top) {
-        top = y - ttRect.height + 10;
+
+    // Clamp bottom edge against legend panel (if visible) or viewport
+    const legendEl = document.querySelector("#legend-panel");
+    const bottomBound = (legendEl && !legendEl.hidden)
+        ? legendEl.getBoundingClientRect().top - 8
+        : window.innerHeight - 8;
+    if (top + ttRect.height > bottomBound) {
+        top = bottomBound - ttRect.height;
     }
+
+    // Clamp to screen edges
+    left = Math.max(left, 8);
+    top = Math.max(top, 8);
 
     tt.style.left = `${left}px`;
     tt.style.top = `${top}px`;
@@ -573,6 +583,8 @@ function showPopupAt(lngLat, props) {
     selectedFeatureId = props[metadata.idField ?? "RGIId"] ?? null;
     setPointSelected(selectedFeatureId, true);
     setPolygonSelected(selectedFeatureId, true);
+
+    hideTooltip();
 
     activePopup
         .setLngLat(lngLat)
@@ -670,7 +682,9 @@ function wireHoverLayer(layerId, sourceId, sourceLayer, setHoverFn, clearHoverVa
             setHoverFn(fid, true);
         }
 
-        showTooltip(e.originalEvent.clientX, e.originalEvent.clientY, feature.properties);
+        if (!activePopup.isOpen()) {
+            showTooltip(e.originalEvent.clientX, e.originalEvent.clientY, feature.properties);
+        }
     });
 
     map.on("mouseleave", layerId, () => {
@@ -1075,7 +1089,9 @@ async function bootstrap() {
             window.hoveredPointId = fid;
             setPointHover(fid, true);
         }
-        showTooltip(e.originalEvent.clientX, e.originalEvent.clientY, e.features[0].properties);
+        if (!activePopup.isOpen()) {
+            showTooltip(e.originalEvent.clientX, e.originalEvent.clientY, e.features[0].properties);
+        }
     });
 
     map.on("mouseleave", "glaciers-points", () => {
@@ -1095,7 +1111,9 @@ async function bootstrap() {
             window.hoveredPolygonId = fid;
             setPolygonHover(fid, true);
         }
-        showTooltip(e.originalEvent.clientX, e.originalEvent.clientY, e.features[0].properties);
+        if (!activePopup.isOpen()) {
+            showTooltip(e.originalEvent.clientX, e.originalEvent.clientY, e.features[0].properties);
+        }
     });
 
     map.on("mouseleave", "glaciers-polygons-fill", () => {
