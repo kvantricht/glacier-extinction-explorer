@@ -1,6 +1,6 @@
 {
   "name": "glacier-extinction-explorer",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Browser-based interactive map for exploring glacier extinction projections worldwide.",
   "homepage": "https://kvantricht.github.io/glacier-extinction-explorer/",
   "repository": {

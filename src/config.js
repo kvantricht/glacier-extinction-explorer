@@ -6,7 +6,7 @@
  * Base URL for externally hosted PMTiles assets (for example Cloudflare R2).
  * Leave null to load PMTiles from the local ./data directory.
  */
-export const PMTILES_BASE_URL = "https://pub-6b5363ed35ff4c4b8842187caba576bb.r2.dev";
+export const PMTILES_BASE_URL = "https://data.glacierextinction.com";
 
 /** Same-origin data directory used for small JSON assets kept in the repo. */
 const LOCAL_DATA_URL = "./data";
