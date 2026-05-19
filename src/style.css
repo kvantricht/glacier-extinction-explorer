@@ -321,8 +321,10 @@ button:hover {
     transform: translateX(-50%);
     z-index: 900;
     width: min(372px, calc(100vw - 36px));
-    max-height: min(26vh, 230px);
-    overflow-y: auto;
+    max-height: min(30vh, 260px);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
     padding: 14px 16px;
     border-radius: var(--radius);
     backdrop-filter: blur(18px);
@@ -380,11 +382,32 @@ output {
 .legend {
     column-count: 2;
     column-gap: 10px;
+    overflow-y: auto;
+    flex: 1 1 auto;
+    min-height: 0;
 }
 
 .legend-copy {
     margin-bottom: 6px;
     break-inside: avoid;
+}
+
+.legend-attribution {
+    margin: 8px 0 0;
+    padding-top: 8px;
+    border-top: 1px solid rgba(91, 140, 182, 0.16);
+    font-size: 0.75rem;
+    color: var(--muted);
+    line-height: 1.4;
+}
+
+.legend-attribution a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.legend-attribution a:hover {
+    text-decoration: underline;
 }
 
 .legend-item {
@@ -739,11 +762,6 @@ output {
         column-count: 1;
     }
 
-    /* When attribution is expanded, lift the bottom-right container above the legend */
-    .maplibregl-ctrl-bottom-right:has(.maplibregl-compact-show) {
-        bottom: calc(min(22vh, 184px) + 28px) !important;
-    }
-
     /* Popup: constrain width and height on small screens */
     .maplibregl-popup {
         max-width: calc(100vw - 24px) !important;
@@ -772,10 +790,6 @@ output {
         max-height: min(20vh, 160px);
         padding-top: 12px;
         padding-bottom: 12px;
-    }
-
-    .maplibregl-ctrl-bottom-right:has(.maplibregl-compact-show) {
-        bottom: calc(min(20vh, 160px) + 28px) !important;
     }
 
     .popup-content {

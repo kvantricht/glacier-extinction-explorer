@@ -59,7 +59,7 @@ maplibregl.addProtocol("pmtiles", tileWithRetry);
 
 const map = new maplibregl.Map({
     container: "map",
-    attributionControl: { compact: true },
+    attributionControl: false,
     style: {
         version: 8,
         glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
@@ -971,18 +971,20 @@ function zoomToSearchResult(item) {
 function initPanelToggle() {
     function syncPanelState(collapsed) {
         controlPanel.classList.toggle("is-collapsed", collapsed);
-        panelToggleButton.textContent = "Collapse";
+        panelToggleButton.textContent = collapsed ? "Expand" : "Collapse";
         panelToggleButton.setAttribute("aria-expanded", String(!collapsed));
-        panelToggleButton.setAttribute("aria-label", "Collapse controls");
-        panelToggleButton.title = "Collapse controls";
+        panelToggleButton.setAttribute("aria-label", collapsed ? "Expand controls" : "Collapse controls");
+        panelToggleButton.title = collapsed ? "Expand controls" : "Collapse controls";
         panelLaunchButton.hidden = !collapsed;
         panelLaunchButton.setAttribute("aria-expanded", String(!collapsed));
     }
 
-    syncPanelState(controlPanel.classList.contains("is-collapsed"));
+    // Collapse by default on small screens
+    const startCollapsed = window.matchMedia("(max-width: 840px)").matches;
+    syncPanelState(startCollapsed);
 
     panelToggleButton.addEventListener("click", () => {
-        syncPanelState(true);
+        syncPanelState(!controlPanel.classList.contains("is-collapsed"));
     });
 
     panelLaunchButton.addEventListener("click", () => {
