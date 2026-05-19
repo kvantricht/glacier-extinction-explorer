@@ -316,11 +316,9 @@ button:hover {
 
 .legend-panel {
     position: absolute;
-    /* Center it, but never let the left edge go below 350px (sidebar right edge 338px + 12px gap).
-       At wide screens max() resolves to the 50%-186px term, keeping it visually centered.
-       At medium widths it resolves to 350px, pushing it clear of the left sidebar. */
-    left: max(calc(50% - 186px), 350px);
+    right: 18px;
     bottom: 18px;
+    left: auto;
     transform: none;
     z-index: 900;
     width: min(372px, calc(100vw - 36px));
