@@ -144,6 +144,7 @@ let selectedFeatureId = null;
 const activePopup = new maplibregl.Popup({
     maxWidth: "400px",
     className: "glacier-popup",
+    closeOnClick: false,
 });
 
 // ---------------------------------------------------------------------------
@@ -751,11 +752,13 @@ function wireHoverLayer(layerId, sourceId, sourceLayer, setHoverFn, clearHoverVa
 // Click interactions
 // ---------------------------------------------------------------------------
 
+let glacierClickConsumed = false;
+
 function wireClickLayer(layerId) {
     map.on("click", layerId, (e) => {
         if (!overlayVisible || !e.features.length) return;
 
-        e.originalEvent.stopPropagation();
+        glacierClickConsumed = true;
         const feature = e.features[0];
         popupOpenedByHover = false; // click now owns the popup
         focusFeature(feature, [e.lngLat.lng, e.lngLat.lat], feature.properties);
@@ -763,12 +766,12 @@ function wireClickLayer(layerId) {
 }
 
 map.on("click", (e) => {
-    // Dismiss popup when clicking empty map
-    const layers = ["glaciers-points", "glaciers-polygons-fill"];
-    const hit = layers.some((l) => map.getLayer(l) && map.queryRenderedFeatures(e.point, { layers: [l] }).length > 0);
-    if (!hit) {
-        activePopup.remove();
+    // If a glacier layer handled this click, don't dismiss the popup.
+    if (glacierClickConsumed) {
+        glacierClickConsumed = false;
+        return;
     }
+    activePopup.remove();
 });
 
 // ---------------------------------------------------------------------------
