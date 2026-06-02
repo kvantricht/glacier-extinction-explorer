@@ -16,7 +16,7 @@ const PMTILES_URL_BASE = PMTILES_BASE_URL ?? LOCAL_DATA_URL;
 /** PMTiles source for the overview point layer (zoom 0–10). */
 export const POINTS_PMTILES_URL = `${PMTILES_URL_BASE}/glaciers_points.pmtiles`;
 
-/** PMTiles source for the high-zoom polygon layer (zoom 10–13). */
+/** PMTiles source for the high-zoom polygon layer (zoom 9–13). */
 export const POLYGONS_PMTILES_URL = `${PMTILES_URL_BASE}/glaciers_polygons.pmtiles`;
 
 /** Lightweight JSON typeahead search index produced by build_pmtiles.py. */
@@ -40,7 +40,7 @@ export const POLYGONS_SOURCE_LAYER = "polygons";
 // ---------------------------------------------------------------------------
 
 /** Below this zoom the point layer is shown; at or above it polygons are shown. */
-export const DETAIL_POLYGON_ZOOM = 10;
+export const DETAIL_POLYGON_ZOOM = 11;
 
 // ---------------------------------------------------------------------------
 // Sentinel values (must match build_pmtiles.py constants)
@@ -87,7 +87,7 @@ export function formatScenarioLabel(code) {
     if (!/^\d+$/.test(code)) return code;
     const n = Number(code);
     // e.g. 15 → 1.5°C, 20 → 2.0°C, 27 → 2.7°C, 40 → 4.0°C
-    return `${Math.floor(n / 10)}.${n % 10}\u00b0C warming`;
+    return `${Math.floor(n / 10)}.${n % 10}\u00b0C warming by 2100`;
 }
 
 export function escapeHtml(value) {

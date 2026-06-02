@@ -113,9 +113,15 @@ const searchInput = document.querySelector("#search-input");
 const searchResults = document.querySelector("#search-results");
 const searchStatus = document.querySelector("#search-status");
 const overlayVisibleInput = document.querySelector("#overlay-visible-input");
-const overlayOpacityInput = document.querySelector("#overlay-opacity-input");
-const overlayOpacityValue = document.querySelector("#overlay-opacity-value");
+const hoverOutlineInput = document.querySelector("#hover-outline-input");
+const hoverMetadataInput = document.querySelector("#hover-metadata-input");
 const hoverTooltip = document.querySelector("#hover-tooltip");
+
+// Collapse the legend panel — set by initLegendToggle, called by initPanelToggle
+let collapseLegend = () => { };
+
+// Wire the legend collapse toggle immediately (before bootstrap / map load)
+initLegendToggle();
 
 // ---------------------------------------------------------------------------
 // Application state
@@ -126,7 +132,11 @@ let searchIndex = [];      // search_index.json contents
 let bboxActive = false;    // true while box-zoom drag mode is active
 let terrainEnabled = false;
 let overlayVisible = true;
-let overlayOpacity = Number(overlayOpacityInput.value) / 100;
+const overlayOpacity = 0.75;
+let hoverOutlineEnabled = false;
+let hoverMetadataEnabled = false;
+// True when the current popup was opened by hover; false when opened by click.
+let popupOpenedByHover = false;
 let activeScenarioKey = null;
 let hoveredPointId = null;
 let hoveredPolygonId = null;
@@ -171,8 +181,8 @@ function getCurrentScenario() {
 // ---------------------------------------------------------------------------
 
 function decodeYearLabel(encoded) {
-    if (encoded === null || encoded === undefined) return "Survives through 2100";
-    if (encoded === SURVIVES_SENTINEL || encoded >= STUDY_HORIZON_YEAR) return "Survives through 2100";
+    if (encoded === null || encoded === undefined) return "Survives";
+    if (encoded === SURVIVES_SENTINEL || encoded >= STUDY_HORIZON_YEAR) return "Survives";
     if (encoded === EXTINCT_SENTINEL || encoded < CURRENT_YEAR) return "Already extinct";
     return String(encoded);
 }
@@ -345,6 +355,25 @@ function addGlacierLayers() {
                 1.1,
             ],
             "line-opacity": overlayOpacity,
+        },
+    });
+
+    // ----- Hover-outline preview (vector tile layer, filtered by hovered ID) -----
+    // Rendered directly from the polygon source so MapLibre handles tile-boundary
+    // stitching — no clipping artefacts. Hidden by default; filter is updated on
+    // point hover. minzoom 9 also forces polygon tile loading below DETAIL_POLYGON_ZOOM.
+    map.addLayer({
+        id: "hover-outline-line",
+        type: "line",
+        source: "glaciers-polygons",
+        "source-layer": POLYGONS_SOURCE_LAYER,
+        minzoom: 9,
+        maxzoom: DETAIL_POLYGON_ZOOM,
+        filter: ["boolean", false],
+        paint: {
+            "line-color": "#4db0ff",
+            "line-width": 2,
+            "line-opacity": 0.85,
         },
     });
 }
@@ -639,20 +668,42 @@ function focusFeature(feature, fallbackLngLat, popupProps) {
         const [sw, ne] = bounds;
         const isPointLike = Math.abs(sw[0] - ne[0]) < 1e-10 && Math.abs(sw[1] - ne[1]) < 1e-10;
         if (!isPointLike) {
-            map.fitBounds(bounds, {
+            const fitOpts = {
                 padding: { top: 40, right: 40, bottom: 240, left: 40 },
-                maxZoom: 14,
-                duration: 900,
+                maxZoom: 13,
                 offset: [0, 120],
-            });
+            };
+            // cameraForBounds tells us the natural zoom fitBounds would choose.
+            // If that zoom is below DETAIL_POLYGON_ZOOM the polygon layer would
+            // disappear, so we instead fly to the glacier's center at the
+            // minimum polygon zoom.
+            const camera = map.cameraForBounds(bounds, fitOpts);
+            if (camera && camera.zoom < DETAIL_POLYGON_ZOOM) {
+                map.flyTo({
+                    center: camera.center,
+                    zoom: DETAIL_POLYGON_ZOOM,
+                    duration: 900,
+                    offset: [0, 120],
+                });
+            } else {
+                map.fitBounds(bounds, { ...fitOpts, duration: 900 });
+            }
             return;
         }
     }
 
     if (popupLngLat) {
+        // Estimate a sensible zoom from the natural-log area (km²) stored in the point tile.
+        // ln(1500 km²) ≈ 7.3  → zoom 9 (large outlet glacier)
+        // ln(20 km²)   ≈ 3.0  → zoom 11
+        // ln(0.1 km²)  ≈ -2.3 → zoom 13 (tiny glacier)
+        const logArea = feature?.properties?.log_area;
+        const targetZoom = Number.isFinite(logArea)
+            ? Math.max(DETAIL_POLYGON_ZOOM, Math.min(13, Math.round(11 - (logArea - 3) * 1.2)))
+            : 11;
         map.flyTo({
             center: popupLngLat,
-            zoom: Math.max(map.getZoom(), 13),
+            zoom: Math.max(map.getZoom(), targetZoom),
             duration: 900,
             offset: [0, 120],
         });
@@ -662,6 +713,7 @@ function focusFeature(feature, fallbackLngLat, popupProps) {
 activePopup.on("close", () => {
     clearSelectedState();
     selectedFeatureId = null;
+    popupOpenedByHover = false;
 });
 
 // ---------------------------------------------------------------------------
@@ -705,6 +757,7 @@ function wireClickLayer(layerId) {
 
         e.originalEvent.stopPropagation();
         const feature = e.features[0];
+        popupOpenedByHover = false; // click now owns the popup
         focusFeature(feature, [e.lngLat.lng, e.lngLat.lat], feature.properties);
     });
 }
@@ -932,7 +985,7 @@ function zoomToSearchResult(item) {
     if (!Number.isFinite(item.lat) || !Number.isFinite(item.lon)) return;
 
     activePopup.remove();
-    map.flyTo({ center: [item.lon, item.lat], zoom: 13, duration: 900, offset: [0, 120] });
+    map.flyTo({ center: [item.lon, item.lat], zoom: 12, duration: 900, offset: [0, 120] });
 
     map.once("idle", () => {
         // Try to find the rendered feature and open its popup
@@ -960,13 +1013,43 @@ function zoomToSearchResult(item) {
         <p class="popup-note">Zoom in further for full detail.</p></div>`
             )
             .addTo(map);
-        map.flyTo({ center: [item.lon, item.lat], zoom: 13, duration: 900, offset: [0, 120] });
+        map.flyTo({ center: [item.lon, item.lat], zoom: 12, duration: 900, offset: [0, 120] });
     });
 }
 
 // ---------------------------------------------------------------------------
 // Panel toggle
 // ---------------------------------------------------------------------------
+
+function initLegendToggle() {
+    const legendPanel = document.querySelector("#legend-panel");
+    const legendToggleButton = document.querySelector("#legend-toggle-button");
+    if (!legendPanel || !legendToggleButton) return;
+
+    const isMobile = window.matchMedia("(max-width: 840px)").matches;
+
+    // Only show and wire the button on mobile
+    if (isMobile) {
+        legendToggleButton.hidden = false;
+    }
+
+    function syncLegendState(expanded) {
+        legendPanel.classList.toggle("is-expanded", expanded);
+        document.body.toggleAttribute("data-legend-expanded", expanded);
+        legendToggleButton.setAttribute("aria-expanded", String(expanded));
+        legendToggleButton.innerHTML = expanded ? "&#x25BC;" : "&#x25B2;";
+        legendToggleButton.title = expanded ? "Collapse legend" : "Expand legend";
+    }
+
+    collapseLegend = () => syncLegendState(false);
+
+    // Start collapsed on mobile, expanded on desktop
+    syncLegendState(!isMobile);
+
+    legendToggleButton.addEventListener("click", () => {
+        syncLegendState(!legendPanel.classList.contains("is-expanded"));
+    });
+}
 
 function initPanelToggle() {
     function syncPanelState(collapsed) {
@@ -977,6 +1060,8 @@ function initPanelToggle() {
         panelToggleButton.title = collapsed ? "Expand controls" : "Collapse controls";
         panelLaunchButton.hidden = !collapsed;
         panelLaunchButton.setAttribute("aria-expanded", String(!collapsed));
+        // Collapse the legend when the control panel opens, to avoid overlap on mobile
+        if (!collapsed) collapseLegend();
     }
 
     // Collapse by default on small screens
@@ -1085,14 +1170,35 @@ async function bootstrap() {
         if (!overlayVisible || !e.features.length) return;
         if (bboxActive) return;
         map.getCanvas().style.cursor = "pointer";
-        const fid = e.features[0].id;
-        if (fid !== window.hoveredPointId) {
+        const feature = e.features[0];
+        const fid = feature.id;
+        const featureChanged = fid !== window.hoveredPointId;
+        if (featureChanged) {
             setPointHover(window.hoveredPointId, false);
             window.hoveredPointId = fid;
             setPointHover(fid, true);
         }
-        if (!activePopup.isOpen()) {
-            showTooltip(e.originalEvent.clientX, e.originalEvent.clientY, e.features[0].properties);
+
+        // hoverOwnsPopup: true when there is no popup yet, or when hover opened it.
+        const hoverOwnsPopup = !activePopup.isOpen() || popupOpenedByHover;
+
+        if (hoverMetadataEnabled && hoverOwnsPopup) {
+            if (featureChanged) {
+                showPopupAt([e.lngLat.lng, e.lngLat.lat], feature.properties);
+                popupOpenedByHover = true;
+            }
+        } else if (!activePopup.isOpen()) {
+            showTooltip(e.originalEvent.clientX, e.originalEvent.clientY, feature.properties);
+        }
+
+        if (hoverOutlineEnabled && hoverOwnsPopup) {
+            const idField = metadata.idField ?? "RGIId";
+            const rgiId = feature.properties[idField];
+            if (rgiId != null) {
+                map.setFilter("hover-outline-line", ["==", ["get", idField], rgiId]);
+            }
+        } else if (!hoverOwnsPopup) {
+            map.setFilter("hover-outline-line", ["boolean", false]);
         }
     });
 
@@ -1101,20 +1207,32 @@ async function bootstrap() {
         setPointHover(window.hoveredPointId, false);
         window.hoveredPointId = null;
         hideTooltip();
+        map.setFilter("hover-outline-line", ["boolean", false]);
+        if (popupOpenedByHover) activePopup.remove();
     });
 
     map.on("mousemove", "glaciers-polygons-fill", (e) => {
         if (!overlayVisible || !e.features.length) return;
         if (bboxActive) return;
         map.getCanvas().style.cursor = "pointer";
-        const fid = e.features[0].id;
-        if (fid !== window.hoveredPolygonId) {
+        const feature = e.features[0];
+        const fid = feature.id;
+        const featureChanged = fid !== window.hoveredPolygonId;
+        if (featureChanged) {
             setPolygonHover(window.hoveredPolygonId, false);
             window.hoveredPolygonId = fid;
             setPolygonHover(fid, true);
         }
-        if (!activePopup.isOpen()) {
-            showTooltip(e.originalEvent.clientX, e.originalEvent.clientY, e.features[0].properties);
+
+        const hoverOwnsPopup = !activePopup.isOpen() || popupOpenedByHover;
+
+        if (hoverMetadataEnabled && hoverOwnsPopup) {
+            if (featureChanged) {
+                showPopupAt([e.lngLat.lng, e.lngLat.lat], feature.properties);
+                popupOpenedByHover = true;
+            }
+        } else if (!activePopup.isOpen()) {
+            showTooltip(e.originalEvent.clientX, e.originalEvent.clientY, feature.properties);
         }
     });
 
@@ -1123,6 +1241,7 @@ async function bootstrap() {
         setPolygonHover(window.hoveredPolygonId, false);
         window.hoveredPolygonId = null;
         hideTooltip();
+        if (popupOpenedByHover) activePopup.remove();
     });
 
     wireClickLayer("glaciers-points");
@@ -1159,10 +1278,18 @@ async function bootstrap() {
         applyVisibility();
     });
 
-    overlayOpacityInput.addEventListener("input", () => {
-        overlayOpacity = Number(overlayOpacityInput.value) / 100;
-        overlayOpacityValue.textContent = `${Math.round(overlayOpacity * 100)}%`;
-        applyOpacityStyles();
+    hoverOutlineInput.addEventListener("change", () => {
+        hoverOutlineEnabled = hoverOutlineInput.checked;
+        if (!hoverOutlineEnabled) {
+            map.setFilter("hover-outline-line", ["boolean", false]);
+        }
+    });
+
+    hoverMetadataInput.addEventListener("change", () => {
+        hoverMetadataEnabled = hoverMetadataInput.checked;
+        if (!hoverMetadataEnabled && popupOpenedByHover) {
+            activePopup.remove();
+        }
     });
 
     resetViewButton.addEventListener("click", () => {
@@ -1254,7 +1381,6 @@ async function bootstrap() {
     updateLegend();
     updateScenarioStats();
     initSearch();
-    overlayOpacityValue.textContent = `${Math.round(overlayOpacity * 100)}%`;
 }
 
 bootstrap().catch((err) => {

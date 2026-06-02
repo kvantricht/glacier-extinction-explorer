@@ -314,6 +314,32 @@ button:hover {
     gap: 10px;
 }
 
+/* Toggle button — hidden on desktop, shown on mobile (visibility controlled by JS via hidden attr) */
+.legend-toggle {
+    margin-left: auto;
+    flex-shrink: 0;
+    background: transparent !important;
+    border: none !important;
+    color: var(--muted);
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    line-height: 1;
+    cursor: pointer;
+    border-radius: 6px;
+    transform: none !important;
+    opacity: 0.75;
+}
+
+.legend-toggle[hidden] {
+    display: none !important;
+}
+
+.legend-toggle:hover {
+    background: rgba(255, 255, 255, 0.08) !important;
+    opacity: 1 !important;
+    transform: none !important;
+}
+
 .legend-panel {
     position: absolute;
     right: 18px;
@@ -735,12 +761,14 @@ output {
         /* 10px margin + 29px nav ctrl width + 9px gap = 48px — keeps clear of bbox/terrain buttons */
         right: 48px;
         width: auto;
-        bottom: calc(18px + min(22vh, 184px) + 12px);
+        /* Fixed offset: 18px screen margin + ~52px collapsed legend header + 12px gap */
+        bottom: 82px;
         gap: 12px;
     }
 
     .control-panel {
-        max-height: calc(100vh - 18px - min(22vh, 184px) - 12px - 146px);
+        max-height: calc(100vh - 228px);
+        /* 146px top header + 82px bottom clearance */
     }
 
     .panel-toolbar {
@@ -749,7 +777,13 @@ output {
 
     #panel-launch-button {
         top: auto;
-        bottom: 18px;
+        bottom: 82px;
+        /* sits just above the legend header bar */
+    }
+
+    /* When the legend is expanded, lift the launch button above it */
+    body[data-legend-expanded] #panel-launch-button {
+        bottom: calc(min(55vh, 380px) + 30px);
     }
 
     .legend-panel {
@@ -757,7 +791,27 @@ output {
         right: 48px;
         width: auto;
         transform: none;
-        max-height: min(22vh, 184px);
+        /* No max-height when collapsed — it shrinks to the header naturally */
+        max-height: none;
+        padding: 10px 16px;
+    }
+
+    /* Show the toggle chevron on mobile (JS removes hidden attr) */
+
+    /* Collapsed (default): hide legend items and attribution */
+    .legend-panel:not(.is-expanded) .legend,
+    .legend-panel:not(.is-expanded) .legend-attribution {
+        display: none;
+    }
+
+    /* Expanded: cap height and restore scroll */
+    .legend-panel.is-expanded {
+        max-height: min(55vh, 380px);
+    }
+
+    /* Attribution is hidden on mobile to save precious space */
+    .legend-attribution {
+        display: none;
     }
 
     .legend {
@@ -780,18 +834,12 @@ output {
 }
 
 @media (max-width: 840px) and (max-height: 760px) {
-    .left-sidebar-stack {
-        bottom: calc(18px + min(20vh, 160px) + 10px);
+    .legend-panel.is-expanded {
+        max-height: min(45vh, 300px);
     }
 
-    .control-panel {
-        max-height: calc(100vh - 18px - min(20vh, 160px) - 10px - 146px);
-    }
-
-    .legend-panel {
-        max-height: min(20vh, 160px);
-        padding-top: 12px;
-        padding-bottom: 12px;
+    body[data-legend-expanded] #panel-launch-button {
+        bottom: calc(min(45vh, 300px) + 30px);
     }
 
     .popup-content {

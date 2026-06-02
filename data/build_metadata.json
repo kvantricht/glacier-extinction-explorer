@@ -3,7 +3,7 @@
     {
       "code": "15",
       "key": "all:15",
-      "label": "1.5°C warming",
+      "label": "1.5°C warming by 2100",
       "tileFields": {
         "median": "ext_15",
         "q1": "ext_15_q1",
@@ -14,7 +14,7 @@
     {
       "code": "20",
       "key": "all:20",
-      "label": "2.0°C warming",
+      "label": "2.0°C warming by 2100",
       "tileFields": {
         "median": "ext_20",
         "q1": "ext_20_q1",
@@ -25,7 +25,7 @@
     {
       "code": "27",
       "key": "all:27",
-      "label": "2.7°C warming",
+      "label": "2.7°C warming by 2100",
       "tileFields": {
         "median": "ext_27",
         "q1": "ext_27_q1",
@@ -36,7 +36,7 @@
     {
       "code": "40",
       "key": "all:40",
-      "label": "4.0°C warming",
+      "label": "4.0°C warming by 2100",
       "tileFields": {
         "median": "ext_40",
         "q1": "ext_40_q1",

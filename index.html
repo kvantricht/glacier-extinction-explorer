@@ -79,11 +79,14 @@
               <input id="overlay-visible-input" type="checkbox" checked />
               <span>Show glacier layer</span>
             </label>
-            <label for="overlay-opacity-input">Overlay opacity</label>
-            <div class="range-row">
-              <input id="overlay-opacity-input" type="range" min="15" max="100" value="75" />
-              <output id="overlay-opacity-value" for="overlay-opacity-input">75%</output>
-            </div>
+            <label class="inline-toggle" for="hover-outline-input">
+              <input id="hover-outline-input" type="checkbox" />
+              <span>Preview outline on hover</span>
+            </label>
+            <label class="inline-toggle" for="hover-metadata-input">
+              <input id="hover-metadata-input" type="checkbox" />
+              <span>Show details on hover</span>
+            </label>
           </section>
 
         </div>
@@ -94,6 +97,10 @@
       <div class="legend-header">
         <h2>Extinction year at: </h2>
         <span id="active-scenario-chip" class="scenario-chip"></span>
+        <button id="legend-toggle-button" class="legend-toggle" type="button" aria-expanded="false"
+          title="Expand legend" hidden>
+          &#x25B2;
+        </button>
       </div>
       <div id="legend" class="legend"></div>
       <p class="legend-attribution">
