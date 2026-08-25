@@ -906,7 +906,8 @@ output {
     border-radius: 4px;
     background: rgba(10, 21, 37, 0.88);
     color: var(--text);
-    font-size: 16px;
+    font-size: 13px;
+    font-weight: 700;
     line-height: 29px;
     text-align: center;
     cursor: pointer;
