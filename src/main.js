@@ -105,6 +105,8 @@ const activeScenarioChip = document.querySelector("#active-scenario-chip");
 const resetViewButton = document.querySelector("#reset-view-button");
 const bboxZoomButton = document.querySelector("#bbox-zoom-button");
 const terrainButton = document.querySelector("#terrain-button");
+const terrainHint = document.querySelector("#terrain-hint");
+const terrainHintClose = document.querySelector("#terrain-hint-close");
 const panelToggleButton = document.querySelector("#panel-toggle-button");
 const panelLaunchButton = document.querySelector("#panel-launch-button");
 const controlPanel = document.querySelector("#control-panel");
@@ -116,6 +118,47 @@ const overlayVisibleInput = document.querySelector("#overlay-visible-input");
 const hoverOutlineInput = document.querySelector("#hover-outline-input");
 const hoverMetadataInput = document.querySelector("#hover-metadata-input");
 const hoverTooltip = document.querySelector("#hover-tooltip");
+const TERRAIN_HINT_STORAGE_KEY = "glacier-extinction-explorer.terrain-hint-seen";
+
+function hasSeenTerrainHint() {
+    try {
+        return window.localStorage.getItem(TERRAIN_HINT_STORAGE_KEY) === "true";
+    } catch {
+        return false;
+    }
+}
+
+function markTerrainHintAsSeen() {
+    try {
+        window.localStorage.setItem(TERRAIN_HINT_STORAGE_KEY, "true");
+    } catch {
+        // Storage can be unavailable in private or restricted browsing modes.
+    }
+}
+
+function dismissTerrainHint() {
+    terrainHint.hidden = true;
+    terrainHint.removeEventListener("keydown", handleTerrainHintKeydown);
+    terrainButton.focus({ preventScroll: true });
+}
+
+function handleTerrainHintKeydown(event) {
+    if (event.key === "Escape") {
+        event.preventDefault();
+        dismissTerrainHint();
+    }
+}
+
+function showTerrainHint() {
+    if (hasSeenTerrainHint()) return;
+
+    markTerrainHintAsSeen();
+    terrainHint.hidden = false;
+    terrainHint.addEventListener("keydown", handleTerrainHintKeydown);
+    requestAnimationFrame(() => terrainHintClose.focus({ preventScroll: true }));
+}
+
+terrainHintClose.addEventListener("click", dismissTerrainHint);
 
 // Collapse the legend panel — set by initLegendToggle, called by initPanelToggle
 let collapseLegend = () => { };
@@ -1130,6 +1173,7 @@ async function bootstrap() {
 
     addGlacierSources();
     addGlacierLayers();
+    showTerrainHint();
 
     terrainButton.addEventListener("click", () => {
         terrainEnabled = !terrainEnabled;
