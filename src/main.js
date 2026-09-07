@@ -28,6 +28,8 @@ import {
     formatNumber,
 } from "./config.js";
 
+import { BASEMAP_GLYPHS_URL, basemapLabelsSource, createBasemapLabelLayers } from "./basemap-labels.js";
+
 // ---------------------------------------------------------------------------
 // PMTiles protocol registration (with retry on network error)
 // ---------------------------------------------------------------------------
@@ -62,7 +64,7 @@ const map = new maplibregl.Map({
     attributionControl: false,
     style: {
         version: 8,
-        glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+        glyphs: BASEMAP_GLYPHS_URL,
         sources: {
             satellite: {
                 type: "raster",
@@ -74,24 +76,11 @@ const map = new maplibregl.Map({
                     "Tiles &copy; Esri, Maxar, Earthstar Geographics, and the GIS User Community | Glacier data: <a href='https://doi.org/10.1038/s41558-025-02513-9' target='_blank' rel='noopener'>Van Tricht et al. (2026)</a>",
                 maxzoom: 19,
             },
-            "basemap-labels": {
-                type: "raster",
-                tiles: [
-                    "https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
-                ],
-                tileSize: 256,
-                maxzoom: 23,
-                attribution: "Esri, HERE, Garmin, &copy; OpenStreetMap contributors, and the GIS user community",
-            },
+            "basemap-labels": basemapLabelsSource,
         },
         layers: [
             { id: "satellite", type: "raster", source: "satellite" },
-            {
-                id: "basemap-labels",
-                type: "raster",
-                source: "basemap-labels",
-                layout: { visibility: "none" },
-            },
+            ...createBasemapLabelLayers(),
         ],
     },
     center: [0, 20],
@@ -145,8 +134,10 @@ terrainButton.setAttribute("aria-pressed", "false");
 
 function syncBasemapLabels() {
     basemapLabelsAttribution.hidden = !basemapLabelsInput.checked;
-    if (map.getLayer("basemap-labels")) {
-        map.setLayoutProperty("basemap-labels", "visibility", basemapLabelsInput.checked ? "visible" : "none");
+    const layers = createBasemapLabelLayers();
+    for (const layer of layers) {
+        if (!map.getLayer(layer.id)) continue;
+        map.setLayoutProperty(layer.id, "visibility", basemapLabelsInput.checked ? "visible" : "none");
     }
 }
 
@@ -212,6 +203,7 @@ let activeScenarioKey = null;
 let hoveredPointId = null;
 let hoveredPolygonId = null;
 let selectedFeatureId = null;
+let popupProperties = null;
 const activePopup = new maplibregl.Popup({
     maxWidth: "400px",
     className: "glacier-popup",
@@ -680,6 +672,7 @@ function buildPopupHtml(props) {
 }
 
 function showPopupAt(lngLat, props) {
+    popupProperties = props;
     clearSelectedState();
     selectedFeatureId = props[metadata.idField ?? "RGIId"] ?? null;
     setPointSelected(selectedFeatureId, true);
@@ -689,102 +682,15 @@ function showPopupAt(lngLat, props) {
 
     activePopup
         .setLngLat(lngLat)
-        .setHTML(buildPopupHtml(props))
-        .addTo(map);
-}
-
-function extendBounds(bounds, coords) {
-    if (!Array.isArray(coords)) return;
-    if (typeof coords[0] === "number" && typeof coords[1] === "number") {
-        bounds[0][0] = Math.min(bounds[0][0], coords[0]);
-        bounds[0][1] = Math.min(bounds[0][1], coords[1]);
-        bounds[1][0] = Math.max(bounds[1][0], coords[0]);
-        bounds[1][1] = Math.max(bounds[1][1], coords[1]);
-        return;
-    }
-    for (const child of coords) extendBounds(bounds, child);
-}
-
-function getFeatureBounds(feature) {
-    const geometry = feature?.geometry;
-    if (!geometry?.coordinates) return null;
-
-    const bounds = [
-        [Infinity, Infinity],
-        [-Infinity, -Infinity],
-    ];
-    extendBounds(bounds, geometry.coordinates);
-
-    if (!Number.isFinite(bounds[0][0])) return null;
-    return bounds;
-}
-
-function getBoundsCenter(bounds) {
-    return [
-        (bounds[0][0] + bounds[1][0]) / 2,
-        (bounds[0][1] + bounds[1][1]) / 2,
-    ];
-}
-
-function focusFeature(feature, fallbackLngLat, popupProps) {
-    const bounds = getFeatureBounds(feature);
-    const popupLngLat = bounds
-        ? getBoundsCenter(bounds)
-        : fallbackLngLat;
-
-    if (popupProps && popupLngLat) {
-        showPopupAt(popupLngLat, popupProps);
-    }
-
-    if (bounds) {
-        const [sw, ne] = bounds;
-        const isPointLike = Math.abs(sw[0] - ne[0]) < 1e-10 && Math.abs(sw[1] - ne[1]) < 1e-10;
-        if (!isPointLike) {
-            const fitOpts = {
-                padding: compactLayout.matches ? 24 : { top: 40, right: 40, bottom: 240, left: 40 },
-                maxZoom: 13,
-                offset: getDetailOffset(),
-            };
-            // cameraForBounds tells us the natural zoom fitBounds would choose.
-            // If that zoom is below DETAIL_POLYGON_ZOOM the polygon layer would
-            // disappear, so we instead fly to the glacier's center at the
-            // minimum polygon zoom.
-            const camera = map.cameraForBounds(bounds, fitOpts);
-            if (camera && camera.zoom < DETAIL_POLYGON_ZOOM) {
-                map.flyTo({
-                    center: camera.center,
-                    zoom: DETAIL_POLYGON_ZOOM,
-                    duration: 900,
-                    offset: getDetailOffset(),
-                });
-            } else {
-                map.fitBounds(bounds, { ...fitOpts, duration: 900 });
-            }
-            return;
-        }
-    }
-
-    if (popupLngLat) {
-        // Estimate a sensible zoom from the natural-log area (km²) stored in the point tile.
-        // ln(1500 km²) ≈ 7.3  → zoom 9 (large outlet glacier)
-        // ln(20 km²)   ≈ 3.0  → zoom 11
-        // ln(0.1 km²)  ≈ -2.3 → zoom 13 (tiny glacier)
-        const logArea = feature?.properties?.log_area;
-        const targetZoom = Number.isFinite(logArea)
-            ? Math.max(DETAIL_POLYGON_ZOOM, Math.min(13, Math.round(11 - (logArea - 3) * 1.2)))
-            : 11;
-        map.flyTo({
-            center: popupLngLat,
-            zoom: Math.max(map.getZoom(), targetZoom),
-            duration: 900,
-            offset: getDetailOffset(),
-        });
-    }
+        .setHTML(buildPopupHtml(props));
+    // Re-adding an open Popup fires its close handler and clears selection.
+    if (!activePopup.isOpen()) activePopup.addTo(map);
 }
 
 activePopup.on("close", () => {
     clearSelectedState();
     selectedFeatureId = null;
+    popupProperties = null;
     popupOpenedByHover = false;
 });
 
@@ -823,26 +729,24 @@ function wireHoverLayer(layerId, sourceId, sourceLayer, setHoverFn, clearHoverVa
 // Click interactions
 // ---------------------------------------------------------------------------
 
-let glacierClickConsumed = false;
+let suppressMapClickUntil = 0;
 
-function wireClickLayer(layerId) {
-    map.on("click", layerId, (e) => {
-        if (!overlayVisible || !e.features.length) return;
-
-        glacierClickConsumed = true;
-        const feature = e.features[0];
-        popupOpenedByHover = false; // click now owns the popup
-        focusFeature(feature, [e.lngLat.lng, e.lngLat.lat], feature.properties);
-    });
-}
-
-map.on("click", (e) => {
-    // If a glacier layer handled this click, don't dismiss the popup.
-    if (glacierClickConsumed) {
-        glacierClickConsumed = false;
-        return;
-    }
-    activePopup.remove();
+// Selection is independent of the camera. A small hit area helps with tiny
+// glaciers on touchscreens; panning, zooming and empty-map clicks keep it pinned.
+map.on("click", (event) => {
+    if (!metadata || !overlayVisible || bboxActive || performance.now() < suppressMapClickUntil) return;
+    const radius = event.originalEvent.pointerType === "touch" || compactLayout.matches ? 8 : 4;
+    const layers = ["glaciers-polygons-fill", "glaciers-points"].filter(id => map.getLayer(id));
+    const features = map.queryRenderedFeatures([
+        [event.point.x - radius, event.point.y - radius],
+        [event.point.x + radius, event.point.y + radius],
+    ], { layers });
+    const feature = features[0];
+    if (!feature) return;
+    map.stop();
+    popupOpenedByHover = false;
+    const anchor = feature.geometry.type === "Point" ? feature.geometry.coordinates : event.lngLat;
+    showPopupAt(anchor, feature.properties);
 });
 
 // ---------------------------------------------------------------------------
@@ -1058,43 +962,31 @@ function initSearch() {
 
 function zoomToSearchResult(item) {
     if (!Number.isFinite(item.lat) || !Number.isFinite(item.lon)) return;
-
-    if (compactLayout.matches) {
-        setControlsOpen(false);
-        setLegendExpanded(false);
-    }
+    if (compactLayout.matches) setControlsOpen(false);
+    setLegendExpanded(false);
     activePopup.remove();
-    map.flyTo({ center: [item.lon, item.lat], zoom: 12, duration: 900, offset: getDetailOffset() });
-
+    popupOpenedByHover = false;
+    selectedFeatureId = item.rgi_id;
+    setPointSelected(selectedFeatureId, true);
+    setPolygonSelected(selectedFeatureId, true);
+    activePopup.setLngLat([item.lon, item.lat]).setHTML(
+        `<div class="popup-content"><h3>${escapeHtml(item.name || item.rgi_id || "Glacier")}</h3>
+        <p class="popup-note">${escapeHtml(item.rgi_id)} ? Loading glacier profile?</p></div>`
+    ).addTo(map);
+    // One predictable search move. Never fit to a clipped vector-tile polygon,
+    // and never move the camera again when the detailed properties arrive.
+    map.flyTo({ center: [item.lon, item.lat], zoom: 11.5, duration: 700, offset: getDetailOffset() });
     map.once("idle", () => {
-        // Try to find the rendered feature and open its popup
-        const point = map.project([item.lon, item.lat]);
-        const radius = 30; // px search radius
-        const bbox = [
-            [point.x - radius, point.y - radius],
-            [point.x + radius, point.y + radius],
-        ];
-
-        for (const layerId of ["glaciers-polygons-fill", "glaciers-points"]) {
-            if (!map.getLayer(layerId)) continue;
-            const features = map.queryRenderedFeatures(bbox, { layers: [layerId] });
-            const match = features.find((feature) =>
-                feature.properties[metadata.idField ?? "RGIId"] === item.rgi_id);
-            if (match) {
-                focusFeature(match, [item.lon, item.lat], match.properties);
-                return;
-            }
+        if (selectedFeatureId !== item.rgi_id || !activePopup.isOpen()) return;
+        const layers = ["glaciers-polygons-fill", "glaciers-points"].filter(id => map.getLayer(id));
+        const match = map.queryRenderedFeatures({ layers }).find(feature =>
+            feature.properties[metadata.idField ?? "RGIId"] === item.rgi_id);
+        if (match) {
+            showPopupAt([item.lon, item.lat], match.properties);
+        } else {
+            activePopup.setHTML(`<div class="popup-content"><h3>${escapeHtml(item.name || item.rgi_id)}</h3>
+                <p class="popup-note">${escapeHtml(item.rgi_id)} ? Pan or zoom to inspect this glacier on the map.</p></div>`);
         }
-
-        // Fallback: minimal popup from search index data
-        activePopup
-            .setLngLat([item.lon, item.lat])
-            .setHTML(
-                `<div class="popup-content"><h3>${escapeHtml(item.name || item.rgi_id || "Glacier")}</h3>
-        <p class="popup-note">Zoom in further for full detail.</p></div>`
-            )
-            .addTo(map);
-        map.flyTo({ center: [item.lon, item.lat], zoom: 12, duration: 900, offset: getDetailOffset() });
     });
 }
 
@@ -1138,7 +1030,7 @@ function setControlsOpen(open, focus = false) {
 
 function syncResponsiveLayout() {
     const focusWasInPanel = controlPanel.contains(document.activeElement);
-    legendToggleButton.hidden = !compactLayout.matches;
+    legendToggleButton.hidden = false;
     setLegendExpanded(!compactLayout.matches);
     setControlsOpen(!compactLayout.matches, focusWasInPanel);
     if (compactLayout.matches) terrainHint.hidden = true;
@@ -1170,14 +1062,20 @@ document.addEventListener("keydown", (event) => {
     }
 });
 activePopup.on("open", () => {
+    setLegendExpanded(false);
     if (!compactLayout.matches) return;
     setControlsOpen(false);
-    setLegendExpanded(false);
 });
 compactLayout.addEventListener("change", syncResponsiveLayout);
 syncResponsiveLayout();
 // Opening the legend changes the map row's height without a window resize.
-new ResizeObserver(() => map.resize()).observe(map.getContainer());
+new ResizeObserver(() => {
+    document.documentElement.style.setProperty("--map-height", `${map.getContainer().clientHeight}px`);
+    map.resize();
+}).observe(map.getContainer());
+new ResizeObserver(() => {
+    document.documentElement.style.setProperty("--legend-height", `${legendPanel.getBoundingClientRect().height}px`);
+}).observe(legendPanel);
 
 // Safari's keyboard can cover the layout viewport without changing dvh.
 // Follow the visible height while leaving pinch zoom to the browser.
@@ -1194,11 +1092,9 @@ if (window.visualViewport) {
 }
 
 function getDetailOffset() {
-    if (!compactLayout.matches) return [0, 120];
-    // Aim the glacier above its profile, in the remaining visible map area.
-    const profileHeight = activePopup.isOpen()
-        ? activePopup.getElement().getBoundingClientRect().height
-        : Math.min((window.visualViewport?.height ?? window.innerHeight) * 0.42, 340);
+    if (!compactLayout.matches) return [0, 0];
+    // Reserve the final profile height even while its placeholder is loading.
+    const profileHeight = Math.min((window.visualViewport?.height ?? window.innerHeight) * 0.42, 340);
     return [0, -profileHeight / 2];
 }
 
@@ -1253,7 +1149,7 @@ async function bootstrap() {
     addGlacierSources();
     addGlacierLayers();
     // Keep place names readable over glacier fills without changing hit testing.
-    map.moveLayer("basemap-labels");
+    for (const layer of createBasemapLabelLayers()) map.moveLayer(layer.id);
     showTerrainHint();
 
     terrainButton.addEventListener("click", () => {
@@ -1373,8 +1269,6 @@ async function bootstrap() {
         if (popupOpenedByHover) activePopup.remove();
     });
 
-    wireClickLayer("glaciers-points");
-    wireClickLayer("glaciers-polygons-fill");
 
     // Wait for the tile sources to be ready, then clear the loading overlay
     // We wait for the 'idle' event which fires once all pending tile loads complete.
@@ -1400,6 +1294,7 @@ async function bootstrap() {
         applyScenarioStyles();
         updateLegend();
         updateScenarioStats();
+        if (activePopup.isOpen() && popupProperties) activePopup.setHTML(buildPopupHtml(popupProperties));
     });
 
     overlayVisibleInput.addEventListener("change", () => {
@@ -1502,6 +1397,7 @@ async function bootstrap() {
     mapCanvas.addEventListener("pointerup", (e) => {
         if (!bboxActive || !bboxStart) return;
         if (mapCanvas.hasPointerCapture(e.pointerId)) mapCanvas.releasePointerCapture(e.pointerId);
+        suppressMapClickUntil = performance.now() + 250;
         const end = toContainerXY(e);
         const x0 = Math.min(bboxStart.x, end.x);
         const y0 = Math.min(bboxStart.y, end.y);
