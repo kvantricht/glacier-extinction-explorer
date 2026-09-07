@@ -406,21 +406,30 @@ function addGlacierLayers() {
         minzoom: DETAIL_POLYGON_ZOOM,
         layout: { visibility: overlayVisible ? "visible" : "none" },
         paint: {
-            "line-color": [
-                "case",
-                ["boolean", ["feature-state", "hover"], false], YEAR_STYLE.hover,
-                ["boolean", ["feature-state", "selected"], false], YEAR_STYLE.selected,
-                YEAR_STYLE.outline,
-            ],
-            "line-width": [
-                "case",
-                ["boolean", ["feature-state", "hover"], false], 2.5,
-                ["boolean", ["feature-state", "selected"], false], 2.5,
-                1.1,
-            ],
+            "line-color": YEAR_STYLE.outline,
+            "line-width": 1.1,
             "line-opacity": overlayOpacity,
         },
     });
+
+    // Filter changes invalidate MapLibre 4's cached terrain textures. Feature
+    // state alone can leave draped outlines frozen after enabling terrain.
+    for (const state of ["selected", "hover"]) {
+        map.addLayer({
+            id: `glaciers-polygons-${state}`,
+            type: "line",
+            source: "glaciers-polygons",
+            "source-layer": POLYGONS_SOURCE_LAYER,
+            minzoom: DETAIL_POLYGON_ZOOM,
+            filter: ["boolean", false],
+            layout: { visibility: overlayVisible ? "visible" : "none" },
+            paint: {
+                "line-color": YEAR_STYLE[state],
+                "line-width": 2.5,
+                "line-opacity": overlayOpacity,
+            },
+        });
+    }
 
     // ----- Hover-outline preview (vector tile layer, filtered by hovered ID) -----
     // Rendered directly from the polygon source so MapLibre handles tile-boundary
@@ -463,13 +472,15 @@ function applyOpacityStyles() {
     map.setPaintProperty("glaciers-points", "circle-stroke-opacity", getPointStrokeOpacity());
     map.setPaintProperty("glaciers-polygons-fill", "fill-opacity", overlayOpacity);
     map.setPaintProperty("glaciers-polygons-line", "line-opacity", overlayOpacity);
+    map.setPaintProperty("glaciers-polygons-selected", "line-opacity", overlayOpacity);
+    map.setPaintProperty("glaciers-polygons-hover", "line-opacity", overlayOpacity);
 }
 
 function applyVisibility() {
     if (!map.getLayer("glaciers-points")) return;
 
     const vis = overlayVisible ? "visible" : "none";
-    for (const id of ["glaciers-points", "glaciers-polygons-fill", "glaciers-polygons-line"]) {
+    for (const id of ["glaciers-points", "glaciers-polygons-fill", "glaciers-polygons-line", "glaciers-polygons-selected", "glaciers-polygons-hover"]) {
         map.setLayoutProperty(id, "visibility", vis);
     }
 
@@ -493,11 +504,7 @@ function setPointHover(id, state) {
 }
 
 function setPolygonHover(id, state) {
-    if (id === null) return;
-    map.setFeatureState(
-        { source: "glaciers-polygons", sourceLayer: POLYGONS_SOURCE_LAYER, id },
-        { hover: state }
-    );
+    setPolygonOutline("hover", id, state);
 }
 
 function setPointSelected(id, state) {
@@ -509,11 +516,15 @@ function setPointSelected(id, state) {
 }
 
 function setPolygonSelected(id, state) {
-    if (id === null) return;
-    map.setFeatureState(
-        { source: "glaciers-polygons", sourceLayer: POLYGONS_SOURCE_LAYER, id },
-        { selected: state }
-    );
+    setPolygonOutline("selected", id, state);
+}
+
+function setPolygonOutline(kind, id, enabled) {
+    const layer = `glaciers-polygons-${kind}`;
+    if (!map.getLayer(layer)) return;
+    map.setFilter(layer, enabled && id != null
+        ? ["==", ["get", metadata.idField ?? "RGIId"], id]
+        : ["boolean", false]);
 }
 
 function clearHoverState() {
@@ -1217,9 +1228,9 @@ async function bootstrap() {
     });
 
     // Wire hover/click for both geometry layers
-    // Use global vars for hover tracking (avoids closure capture issues with feature IDs)
-    window.hoveredPointId = null;
-    window.hoveredPolygonId = null;
+    // Share hover tracking with clearHoverState so hiding the overlay clears it.
+    hoveredPointId = null;
+    hoveredPolygonId = null;
 
     map.on("mousemove", "glaciers-points", (e) => {
         if (mapPointerType === "touch") return;
@@ -1228,10 +1239,10 @@ async function bootstrap() {
         map.getCanvas().style.cursor = "pointer";
         const feature = e.features[0];
         const fid = feature.id;
-        const featureChanged = fid !== window.hoveredPointId;
+        const featureChanged = fid !== hoveredPointId;
         if (featureChanged) {
-            setPointHover(window.hoveredPointId, false);
-            window.hoveredPointId = fid;
+            setPointHover(hoveredPointId, false);
+            hoveredPointId = fid;
             setPointHover(fid, true);
         }
 
@@ -1260,8 +1271,8 @@ async function bootstrap() {
 
     map.on("mouseleave", "glaciers-points", () => {
         map.getCanvas().style.cursor = "";
-        setPointHover(window.hoveredPointId, false);
-        window.hoveredPointId = null;
+        setPointHover(hoveredPointId, false);
+        hoveredPointId = null;
         hideTooltip();
         map.setFilter("hover-outline-line", ["boolean", false]);
         if (popupOpenedByHover) activePopup.remove();
@@ -1274,10 +1285,10 @@ async function bootstrap() {
         map.getCanvas().style.cursor = "pointer";
         const feature = e.features[0];
         const fid = feature.id;
-        const featureChanged = fid !== window.hoveredPolygonId;
+        const featureChanged = fid !== hoveredPolygonId;
         if (featureChanged) {
-            setPolygonHover(window.hoveredPolygonId, false);
-            window.hoveredPolygonId = fid;
+            setPolygonHover(hoveredPolygonId, false);
+            hoveredPolygonId = fid;
             setPolygonHover(fid, true);
         }
 
@@ -1295,8 +1306,8 @@ async function bootstrap() {
 
     map.on("mouseleave", "glaciers-polygons-fill", () => {
         map.getCanvas().style.cursor = "";
-        setPolygonHover(window.hoveredPolygonId, false);
-        window.hoveredPolygonId = null;
+        setPolygonHover(hoveredPolygonId, false);
+        hoveredPolygonId = null;
         hideTooltip();
         if (popupOpenedByHover) activePopup.remove();
     });
