@@ -13,6 +13,7 @@
     --radius: 18px;
     --font-body: "Segoe UI", "Aptos", "Helvetica Neue", sans-serif;
     --font-display: "Georgia", "Times New Roman", serif;
+    --viewport-height: 100dvh;
 }
 
 * {
@@ -38,6 +39,9 @@ body {
 
 #app-shell {
     position: relative;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
 }
 
 #map {
@@ -63,6 +67,7 @@ body {
 }
 
 .header-copy {
+    min-width: 0;
     max-width: 100%;
 }
 
@@ -97,9 +102,12 @@ body {
     position: relative;
     width: 100%;
     height: auto;
-    max-height: calc(100vh - 164px);
+    max-height: calc(100dvh - 164px);
     overflow-x: hidden;
     overflow-y: auto;
+    /* Keep focused inputs/results clear of the sticky toolbar. */
+    scroll-padding-top: 76px;
+    scroll-padding-bottom: 14px;
     padding: 14px;
     border-radius: var(--radius);
     transition: opacity 140ms ease, transform 140ms ease;
@@ -114,7 +122,10 @@ body {
 }
 
 .control-panel-body {
-    display: block;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding-top: 14px;
 }
 
 .control-panel.is-collapsed .control-panel-body {
@@ -145,7 +156,6 @@ body {
 }
 
 .control-panel section+section {
-    margin-top: 18px;
     padding-top: 18px;
     border-top: 1px solid rgba(91, 140, 182, 0.16);
 }
@@ -256,16 +266,14 @@ button:hover {
 }
 
 .search-results {
-    position: absolute;
-    bottom: calc(100% + 8px);
-    left: 0;
-    right: 0;
-    z-index: 20;
+    position: relative;
+    margin-top: 8px;
+    z-index: 1;
     display: grid;
     gap: 6px;
     padding: 8px;
     width: auto;
-    max-height: min(30vh, 220px);
+    max-height: min(30dvh, 220px);
     overflow-y: auto;
     overscroll-behavior: contain;
     border-radius: 14px;
@@ -348,7 +356,7 @@ button:hover {
     transform: none;
     z-index: 900;
     width: min(372px, calc(100vw - 36px));
-    max-height: min(30vh, 260px);
+    max-height: min(40dvh, 340px);
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -366,6 +374,7 @@ button:hover {
 }
 
 .legend-panel .legend-header {
+    flex-shrink: 0;
     margin-bottom: 10px;
 }
 
@@ -407,8 +416,9 @@ output {
 }
 
 .legend {
-    column-count: 2;
-    column-gap: 10px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 10px;
     overflow-y: auto;
     overflow-x: hidden;
     flex: 1 1 auto;
@@ -446,7 +456,7 @@ output {
     min-width: 0;
     break-inside: avoid;
     margin-bottom: 8px;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
 }
 
 .legend-swatch {
@@ -456,6 +466,8 @@ output {
     border: 1px solid rgba(189, 215, 238, 0.24);
     flex: 0 0 auto;
 }
+
+.legend-item:last-child { grid-column: 1 / -1; }
 
 /* --------------------------------------------------------------------------
    Loading overlay
@@ -622,6 +634,8 @@ output {
 }
 
 .glacier-popup .maplibregl-popup-close-button {
+    background: var(--panel-strong);
+    border-radius: 0 16px 0 8px;
     color: var(--muted);
     font-size: 1.1rem;
     padding: 6px 10px;
@@ -634,13 +648,15 @@ output {
 }
 
 .popup-content {
-    max-height: min(58vh, 520px);
+    max-height: min(58dvh, 520px);
     overflow: auto;
     padding: 12px 14px;
     padding-right: 10px;
 }
 
 .popup-content h3 {
+    padding-right: 32px;
+    overflow-wrap: anywhere;
     margin: 0 0 10px;
     font-size: 1rem;
 }
@@ -745,108 +761,6 @@ output {
     filter: invert(1) brightness(0.85);
 }
 
-/* --------------------------------------------------------------------------
-   Responsive
-   -------------------------------------------------------------------------- */
-
-@media (max-width: 840px) {
-    .app-header {
-        /* Leave ~52px on the right for MapLibre nav controls (10px margin + 29px wide + 13px gap) */
-        width: calc(100vw - 70px);
-    }
-
-    .left-sidebar-stack {
-        top: auto;
-        left: 18px;
-        /* 10px margin + 29px nav ctrl width + 9px gap = 48px — keeps clear of bbox/terrain buttons */
-        right: 48px;
-        width: auto;
-        /* Fixed offset: 18px screen margin + ~52px collapsed legend header + 12px gap */
-        bottom: 82px;
-        gap: 12px;
-    }
-
-    .control-panel {
-        max-height: calc(100vh - 228px);
-        /* 146px top header + 82px bottom clearance */
-    }
-
-    .panel-toolbar {
-        top: -14px;
-    }
-
-    #panel-launch-button {
-        top: auto;
-        bottom: 82px;
-        /* sits just above the legend header bar */
-    }
-
-    /* When the legend is expanded, lift the launch button above it */
-    body[data-legend-expanded] #panel-launch-button {
-        bottom: calc(min(55vh, 380px) + 30px);
-    }
-
-    .legend-panel {
-        left: 18px;
-        right: 48px;
-        width: auto;
-        transform: none;
-        /* No max-height when collapsed — it shrinks to the header naturally */
-        max-height: none;
-        padding: 10px 16px;
-    }
-
-    /* Show the toggle chevron on mobile (JS removes hidden attr) */
-
-    /* Collapsed (default): hide legend items and attribution */
-    .legend-panel:not(.is-expanded) .legend,
-    .legend-panel:not(.is-expanded) .legend-attribution {
-        display: none;
-    }
-
-    /* Expanded: cap height and restore scroll */
-    .legend-panel.is-expanded {
-        max-height: min(55vh, 380px);
-    }
-
-    /* Attribution is hidden on mobile to save precious space */
-    .legend-attribution {
-        display: none;
-    }
-
-    .legend {
-        column-count: 1;
-    }
-
-    /* Popup: constrain width and height on small screens */
-    .maplibregl-popup {
-        max-width: calc(100vw - 24px) !important;
-    }
-
-    .maplibregl-popup-content {
-        max-width: 100% !important;
-    }
-
-    .popup-content {
-        max-height: min(44vh, 280px);
-    }
-
-}
-
-@media (max-width: 840px) and (max-height: 760px) {
-    .legend-panel.is-expanded {
-        max-height: min(45vh, 300px);
-    }
-
-    body[data-legend-expanded] #panel-launch-button {
-        bottom: calc(min(45vh, 300px) + 30px);
-    }
-
-    .popup-content {
-        max-height: min(36vh, 200px);
-    }
-}
-
 /* ---------------------------------------------------------------------------
    Bbox zoom rectangle + active button state
    -------------------------------------------------------------------------- */
@@ -859,75 +773,26 @@ output {
     z-index: 10;
 }
 
-/* Bbox-zoom button: sits inside #map (position relative), aligned below
-   MapLibre's top-right NavigationControl group (10px margin + 3×29px buttons + 2px borders ≈ 99px).
-   A 10px gap avoids overlap. */
-#bbox-zoom-button {
-    position: absolute;
-    top: 110px;
-    right: 10px;
-    z-index: 2;
-    width: 29px;
-    height: 29px;
-    padding: 0;
-    margin: 0;
-    border: none;
-    border-radius: 4px;
-    background: rgba(10, 21, 37, 0.88);
-    color: var(--text);
-    font-size: 16px;
-    line-height: 29px;
-    text-align: center;
-    cursor: pointer;
-    box-shadow: 0 0 0 2px rgba(0, 0, 0, .3);
-    display: block;
-}
-
-#bbox-zoom-button:hover {
-    background: rgba(20, 40, 65, 0.96);
-}
-
-#bbox-zoom-button.is-active {
-    background: rgba(0, 102, 204, 0.3);
-    color: #4db0ff;
-    box-shadow: 0 0 0 2px #0066cc;
-}
-
+/* Custom controls share MapLibre's navigation group, so their positions follow
+   the actual button sizes at every breakpoint. */
+#bbox-zoom-button,
 #terrain-button {
-    position: absolute;
-    top: 149px;
-    right: 10px;
-    z-index: 2;
-    width: 29px;
-    height: 29px;
-    padding: 0;
-    margin: 0;
-    border: none;
-    border-radius: 4px;
-    background: rgba(10, 21, 37, 0.88);
-    color: var(--text);
-    font-size: 13px;
     font-weight: 700;
-    line-height: 29px;
-    text-align: center;
-    cursor: pointer;
-    box-shadow: 0 0 0 2px rgba(0, 0, 0, .3);
-    display: block;
+    line-height: 1;
 }
 
-#terrain-button:hover {
-    background: rgba(20, 40, 65, 0.96);
-}
+#bbox-zoom-button { font-size: 16px; }
+#terrain-button { font-size: 13px; }
 
-#terrain-button.is-active {
-    background: rgba(0, 102, 204, 0.3);
-    color: #4db0ff;
-    box-shadow: 0 0 0 2px #0066cc;
+.maplibregl-ctrl-group button.is-active {
+    background: var(--accent-soft) !important;
+    color: var(--accent) !important;
+    box-shadow: inset 0 0 0 2px var(--accent);
 }
 
 .terrain-hint {
     position: absolute;
-    top: 190px;
+    top: 174px;
     right: 10px;
     z-index: 3;
     width: min(270px, calc(100vw - 86px));
@@ -1016,7 +881,7 @@ output {
     inset: 0;
     z-index: 1100;
     width: min(680px, calc(100vw - 48px));
-    max-height: calc(100vh - 48px);
+    max-height: calc(100dvh - 48px);
     margin: auto;
     padding: 0;
     border: 1px solid var(--panel-border);
@@ -1036,10 +901,11 @@ output {
 .about-modal-inner {
     display: flex;
     flex-direction: column;
-    max-height: calc(100vh - 48px);
+    max-height: calc(100dvh - 48px);
 }
 
 .about-modal-header {
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -1058,6 +924,8 @@ output {
 }
 
 .about-modal-body {
+    min-height: 0;
+    overflow-wrap: anywhere;
     padding: 20px;
     overflow-y: auto;
     overscroll-behavior: contain;
@@ -1096,6 +964,7 @@ output {
 }
 
 .about-modal-footer {
+    flex-shrink: 0;
     padding: 12px 20px;
     border-top: 1px solid var(--panel-border);
     display: flex;
@@ -1106,4 +975,203 @@ output {
     font-size: 0.8rem;
     color: var(--muted);
     font-variant-numeric: tabular-nums;
+}
+
+.explore-help {
+    border-top: 1px solid var(--panel-border);
+    padding-top: 14px;
+}
+
+.explore-help summary { cursor: pointer; color: var(--accent); padding-block: 8px; }
+.explore-help .panel-copy { margin-top: 8px; }
+.map-dock { display: contents; }
+.panel-launch-label { display: none; }
+
+:where(button, input, select, summary, a):focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.control-panel, .popup-content, .legend-panel, .legend, .map-dock, .about-modal-body {
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--muted) var(--panel-strong);
+}
+
+/* Header and dock take their natural height; the map fills the remaining row.
+   Panels no longer depend on guessed header/legend offsets. */
+@media (max-width: 840px) {
+    #app-shell {
+        height: min(100dvh, var(--viewport-height));
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        padding: env(safe-area-inset-top) env(safe-area-inset-right)
+            env(safe-area-inset-bottom) env(safe-area-inset-left);
+    }
+
+    .app-header {
+        position: relative;
+        grid-area: 1 / 1;
+        inset: auto;
+        width: auto;
+        padding: 8px 12px;
+        gap: 8px;
+        border-radius: 0;
+        align-items: center;
+    }
+
+    .app-header h1 { font-size: 1.1rem; line-height: 1.15; }
+    .eyebrow { display: none; }
+    .about-button { padding-inline: 10px; }
+
+    #map {
+        grid-area: 2 / 1;
+        min-height: 0;
+        min-width: 0;
+        height: 100%;
+    }
+
+    .map-dock {
+        grid-area: 3 / 1;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 8px;
+        padding: 8px;
+        max-height: calc(var(--viewport-height) * 0.38);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        background: var(--panel-strong);
+        border-top: 1px solid var(--panel-border);
+        z-index: 900;
+        min-width: 0;
+    }
+
+    #panel-launch-button {
+        grid-area: 1 / 1;
+        position: sticky;
+        inset: auto;
+        top: 0;
+        z-index: 2;
+        align-self: start;
+        display: inline-flex;
+        width: auto;
+        height: 48px;
+        gap: 6px;
+        padding: 0 10px;
+        border-radius: 12px;
+        font-size: 0.85rem;
+        box-shadow: none;
+    }
+
+    #panel-launch-button[aria-expanded="true"] { background: var(--accent-soft); }
+    .panel-launch-label { display: inline; }
+
+    .legend-panel { display: contents; }
+
+    .legend-panel .legend-header {
+        grid-area: 1 / 2;
+        z-index: 2;
+        position: sticky;
+        top: 0;
+        background: var(--panel-strong);
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 44px;
+        column-gap: 0;
+        row-gap: 2px;
+        margin: 0;
+        padding-block: 4px;
+        min-height: 48px;
+    }
+
+    .legend-panel h2 { font-size: 0.75rem; }
+    .scenario-chip {
+        grid-column: 1;
+        font-size: 0.8rem;
+        padding: 0;
+        border-radius: 0;
+        background: none;
+    }
+
+    .legend-toggle {
+        grid-column: 2;
+        grid-row: 1 / 3;
+        align-self: center;
+        opacity: 1;
+        margin: 0;
+    }
+
+    .legend-panel:not(.is-expanded) .legend,
+    .legend-panel:not(.is-expanded) .legend-attribution { display: none; }
+    .legend {
+        grid-area: 2 / 1 / auto / -1;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        overflow: visible;
+        padding-top: 4px;
+    }
+    .legend-attribution { grid-area: 3 / 1 / auto / -1; margin: 0; padding-bottom: 4px; }
+
+    .left-sidebar-stack {
+        grid-area: 2 / 1;
+        position: relative;
+        align-self: end;
+        justify-self: center;
+        inset: auto;
+        width: min(480px, calc(100% - 16px));
+        max-height: min(calc(var(--viewport-height) * 0.44), calc(100% - 64px));
+        min-height: 0;
+        margin-bottom: 8px;
+        gap: 0;
+    }
+
+    .control-panel {
+        max-height: inherit;
+        padding: 12px;
+        border-radius: 16px;
+    }
+
+    .panel-toolbar { top: -12px; margin: -12px -12px 0; padding: 8px 12px; }
+    .control-panel .panel-title { margin: 0; }
+    .control-panel-body { gap: 12px; padding-top: 12px; }
+    .control-panel section+section { padding-top: 12px; }
+    .microcopy { font-size: 0.8rem; }
+    input, select { font-size: 16px; min-width: 0; }
+    button, select, input:not([type="checkbox"]), summary { min-height: 44px; }
+    button { min-width: 44px; }
+    .inline-toggle { min-height: 44px; margin-bottom: 4px; font-size: 0.9rem; }
+    .inline-toggle input { width: 20px; height: 20px; flex: 0 0 auto; }
+    .search-results { max-height: none; }
+    .search-result { overflow-wrap: anywhere; }
+
+    .maplibregl-ctrl-top-right .maplibregl-ctrl { margin: 8px; }
+    .maplibregl-ctrl-group { display: flex; }
+    .maplibregl-ctrl-group button { width: 44px; height: 44px; }
+    .terrain-hint { display: none; }
+
+    /* Profiles stay inside the map row, clear of the dock and map tools. */
+    .glacier-popup {
+        top: auto !important;
+        bottom: 8px;
+        left: 8px !important;
+        right: 8px;
+        width: min(480px, calc(100% - 16px));
+        max-width: none !important;
+        margin-inline: auto;
+        transform: none !important;
+    }
+
+    .glacier-popup .maplibregl-popup-tip { display: none; }
+    .glacier-popup .maplibregl-popup-content { width: 100%; max-width: none; }
+    .glacier-popup .popup-content { max-height: min(calc(var(--viewport-height) * 0.42), 340px); }
+    .popup-table { table-layout: fixed; overflow-wrap: anywhere; }
+    .maplibregl-popup-close-button { min-width: 44px; min-height: 44px; }
+    #hover-tooltip { display: none; }
+
+    .about-modal { width: calc(100% - 24px); max-height: calc(var(--viewport-height) - 24px); }
+    .about-modal-inner { max-height: calc(var(--viewport-height) - 26px); }
+    .about-modal-header, .about-modal-body { padding: 12px; }
+    .about-modal-footer { padding: 8px 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    button, .control-panel { transition: none; }
 }

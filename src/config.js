@@ -7,6 +7,7 @@
  * Leave null to load PMTiles from the local ./data directory.
  */
 export const PMTILES_BASE_URL = "https://data.glacierextinction.com";
+// export const PMTILES_BASE_URL = null;
 
 /** Same-origin data directory used for small JSON assets kept in the repo. */
 const LOCAL_DATA_URL = "./data";

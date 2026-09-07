@@ -74,8 +74,25 @@ const map = new maplibregl.Map({
                     "Tiles &copy; Esri, Maxar, Earthstar Geographics, and the GIS User Community | Glacier data: <a href='https://doi.org/10.1038/s41558-025-02513-9' target='_blank' rel='noopener'>Van Tricht et al. (2026)</a>",
                 maxzoom: 19,
             },
+            "basemap-labels": {
+                type: "raster",
+                tiles: [
+                    "https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+                ],
+                tileSize: 256,
+                maxzoom: 23,
+                attribution: "Esri, HERE, Garmin, &copy; OpenStreetMap contributors, and the GIS user community",
+            },
         },
-        layers: [{ id: "satellite", type: "raster", source: "satellite" }],
+        layers: [
+            { id: "satellite", type: "raster", source: "satellite" },
+            {
+                id: "basemap-labels",
+                type: "raster",
+                source: "basemap-labels",
+                layout: { visibility: "none" },
+            },
+        ],
     },
     center: [0, 20],
     zoom: 2,
@@ -115,9 +132,26 @@ const searchInput = document.querySelector("#search-input");
 const searchResults = document.querySelector("#search-results");
 const searchStatus = document.querySelector("#search-status");
 const overlayVisibleInput = document.querySelector("#overlay-visible-input");
+const basemapLabelsInput = document.querySelector("#basemap-labels-input");
+const basemapLabelsAttribution = document.querySelector("#basemap-labels-attribution");
 const hoverOutlineInput = document.querySelector("#hover-outline-input");
 const hoverMetadataInput = document.querySelector("#hover-metadata-input");
 const hoverTooltip = document.querySelector("#hover-tooltip");
+const compactLayout = window.matchMedia("(max-width: 840px)");
+const navigationGroup = document.querySelector(".maplibregl-ctrl-group");
+navigationGroup.append(bboxZoomButton, terrainButton);
+bboxZoomButton.setAttribute("aria-pressed", "false");
+terrainButton.setAttribute("aria-pressed", "false");
+
+function syncBasemapLabels() {
+    basemapLabelsAttribution.hidden = !basemapLabelsInput.checked;
+    if (map.getLayer("basemap-labels")) {
+        map.setLayoutProperty("basemap-labels", "visibility", basemapLabelsInput.checked ? "visible" : "none");
+    }
+}
+
+basemapLabelsInput.addEventListener("change", syncBasemapLabels);
+map.once("load", syncBasemapLabels);
 const TERRAIN_HINT_STORAGE_KEY = "glacier-extinction-explorer.terrain-hint-seen";
 
 function hasSeenTerrainHint() {
@@ -150,7 +184,7 @@ function handleTerrainHintKeydown(event) {
 }
 
 function showTerrainHint() {
-    if (hasSeenTerrainHint()) return;
+    if (compactLayout.matches || hasSeenTerrainHint()) return;
 
     markTerrainHintAsSeen();
     terrainHint.hidden = false;
@@ -159,12 +193,6 @@ function showTerrainHint() {
 }
 
 terrainHintClose.addEventListener("click", dismissTerrainHint);
-
-// Collapse the legend panel — set by initLegendToggle, called by initPanelToggle
-let collapseLegend = () => { };
-
-// Wire the legend collapse toggle immediately (before bootstrap / map load)
-initLegendToggle();
 
 // ---------------------------------------------------------------------------
 // Application state
@@ -713,9 +741,9 @@ function focusFeature(feature, fallbackLngLat, popupProps) {
         const isPointLike = Math.abs(sw[0] - ne[0]) < 1e-10 && Math.abs(sw[1] - ne[1]) < 1e-10;
         if (!isPointLike) {
             const fitOpts = {
-                padding: { top: 40, right: 40, bottom: 240, left: 40 },
+                padding: compactLayout.matches ? 24 : { top: 40, right: 40, bottom: 240, left: 40 },
                 maxZoom: 13,
-                offset: [0, 120],
+                offset: getDetailOffset(),
             };
             // cameraForBounds tells us the natural zoom fitBounds would choose.
             // If that zoom is below DETAIL_POLYGON_ZOOM the polygon layer would
@@ -727,7 +755,7 @@ function focusFeature(feature, fallbackLngLat, popupProps) {
                     center: camera.center,
                     zoom: DETAIL_POLYGON_ZOOM,
                     duration: 900,
-                    offset: [0, 120],
+                    offset: getDetailOffset(),
                 });
             } else {
                 map.fitBounds(bounds, { ...fitOpts, duration: 900 });
@@ -749,7 +777,7 @@ function focusFeature(feature, fallbackLngLat, popupProps) {
             center: popupLngLat,
             zoom: Math.max(map.getZoom(), targetZoom),
             duration: 900,
-            offset: [0, 120],
+            offset: getDetailOffset(),
         });
     }
 }
@@ -941,6 +969,7 @@ function initSearch() {
     function updateActive() {
         searchResults.querySelectorAll(".search-result").forEach((btn, i) => {
             btn.classList.toggle("is-active", i === activeIndex);
+            if (i === activeIndex) btn.scrollIntoView({ block: "nearest" });
         });
     }
 
@@ -1030,8 +1059,12 @@ function initSearch() {
 function zoomToSearchResult(item) {
     if (!Number.isFinite(item.lat) || !Number.isFinite(item.lon)) return;
 
+    if (compactLayout.matches) {
+        setControlsOpen(false);
+        setLegendExpanded(false);
+    }
     activePopup.remove();
-    map.flyTo({ center: [item.lon, item.lat], zoom: 12, duration: 900, offset: [0, 120] });
+    map.flyTo({ center: [item.lon, item.lat], zoom: 12, duration: 900, offset: getDetailOffset() });
 
     map.once("idle", () => {
         // Try to find the rendered feature and open its popup
@@ -1045,8 +1078,10 @@ function zoomToSearchResult(item) {
         for (const layerId of ["glaciers-polygons-fill", "glaciers-points"]) {
             if (!map.getLayer(layerId)) continue;
             const features = map.queryRenderedFeatures(bbox, { layers: [layerId] });
-            if (features.length > 0) {
-                focusFeature(features[0], [item.lon, item.lat], features[0].properties);
+            const match = features.find((feature) =>
+                feature.properties[metadata.idField ?? "RGIId"] === item.rgi_id);
+            if (match) {
+                focusFeature(match, [item.lon, item.lat], match.properties);
                 return;
             }
         }
@@ -1059,7 +1094,7 @@ function zoomToSearchResult(item) {
         <p class="popup-note">Zoom in further for full detail.</p></div>`
             )
             .addTo(map);
-        map.flyTo({ center: [item.lon, item.lat], zoom: 12, duration: 900, offset: [0, 120] });
+        map.flyTo({ center: [item.lon, item.lat], zoom: 12, duration: 900, offset: getDetailOffset() });
     });
 }
 
@@ -1067,60 +1102,104 @@ function zoomToSearchResult(item) {
 // Panel toggle
 // ---------------------------------------------------------------------------
 
-function initLegendToggle() {
-    const legendPanel = document.querySelector("#legend-panel");
-    const legendToggleButton = document.querySelector("#legend-toggle-button");
-    if (!legendPanel || !legendToggleButton) return;
+const legendPanel = document.querySelector("#legend-panel");
+const legendToggleButton = document.querySelector("#legend-toggle-button");
 
-    const isMobile = window.matchMedia("(max-width: 840px)").matches;
-
-    // Only show and wire the button on mobile
-    if (isMobile) {
-        legendToggleButton.hidden = false;
-    }
-
-    function syncLegendState(expanded) {
-        legendPanel.classList.toggle("is-expanded", expanded);
-        document.body.toggleAttribute("data-legend-expanded", expanded);
-        legendToggleButton.setAttribute("aria-expanded", String(expanded));
-        legendToggleButton.innerHTML = expanded ? "&#x25BC;" : "&#x25B2;";
-        legendToggleButton.title = expanded ? "Collapse legend" : "Expand legend";
-    }
-
-    collapseLegend = () => syncLegendState(false);
-
-    // Start collapsed on mobile, expanded on desktop
-    syncLegendState(!isMobile);
-
-    legendToggleButton.addEventListener("click", () => {
-        syncLegendState(!legendPanel.classList.contains("is-expanded"));
-    });
+function setLegendExpanded(expanded) {
+    legendPanel.classList.toggle("is-expanded", expanded);
+    legendToggleButton.setAttribute("aria-expanded", String(expanded));
+    legendToggleButton.innerHTML = expanded ? "&#x25BC;" : "&#x25B2;";
+    const label = expanded ? "Collapse legend" : "Expand legend";
+    legendToggleButton.title = label;
+    legendToggleButton.setAttribute("aria-label", label);
+    if (!expanded) document.querySelector(".map-dock").scrollTop = 0;
 }
 
-function initPanelToggle() {
-    function syncPanelState(collapsed) {
-        controlPanel.classList.toggle("is-collapsed", collapsed);
-        panelToggleButton.textContent = collapsed ? "Expand" : "Collapse";
-        panelToggleButton.setAttribute("aria-expanded", String(!collapsed));
-        panelToggleButton.setAttribute("aria-label", collapsed ? "Expand controls" : "Collapse controls");
-        panelToggleButton.title = collapsed ? "Expand controls" : "Collapse controls";
-        panelLaunchButton.hidden = !collapsed;
-        panelLaunchButton.setAttribute("aria-expanded", String(!collapsed));
-        // Collapse the legend when the control panel opens, to avoid overlap on mobile
-        if (!collapsed) collapseLegend();
+function setControlsOpen(open, focus = false) {
+    if (open && compactLayout.matches) {
+        setLegendExpanded(false);
+        activePopup.remove();
     }
+    controlPanel.classList.toggle("is-collapsed", !open);
+    panelToggleButton.textContent = compactLayout.matches ? "Close" : "Collapse";
+    panelToggleButton.setAttribute("aria-expanded", String(open));
+    panelToggleButton.setAttribute("aria-label", "Close controls");
+    // The mobile dock keeps the same toggle reachable in either state.
+    panelLaunchButton.hidden = open && !compactLayout.matches;
+    panelLaunchButton.setAttribute("aria-expanded", String(open));
+    panelLaunchButton.setAttribute("aria-label", open ? "Close controls" : "Show controls");
+    panelLaunchButton.title = open ? "Close controls" : "Show controls";
+    if (!open) {
+        searchInput.blur();
+        searchResults.hidden = true;
+    }
+    if (focus) (open ? panelToggleButton : panelLaunchButton).focus({ preventScroll: true });
+}
 
-    // Collapse by default on small screens
-    const startCollapsed = window.matchMedia("(max-width: 840px)").matches;
-    syncPanelState(startCollapsed);
+function syncResponsiveLayout() {
+    const focusWasInPanel = controlPanel.contains(document.activeElement);
+    legendToggleButton.hidden = !compactLayout.matches;
+    setLegendExpanded(!compactLayout.matches);
+    setControlsOpen(!compactLayout.matches, focusWasInPanel);
+    if (compactLayout.matches) terrainHint.hidden = true;
+    map.resize();
+}
 
-    panelToggleButton.addEventListener("click", () => {
-        syncPanelState(!controlPanel.classList.contains("is-collapsed"));
-    });
+panelToggleButton.addEventListener("click", () => setControlsOpen(false, true));
+panelLaunchButton.addEventListener("click", () => {
+    setControlsOpen(controlPanel.classList.contains("is-collapsed"), true);
+});
+legendToggleButton.addEventListener("click", () => {
+    const expanded = !legendPanel.classList.contains("is-expanded");
+    if (expanded && compactLayout.matches) {
+        setControlsOpen(false);
+        activePopup.remove();
+    }
+    setLegendExpanded(expanded);
+});
+document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || document.querySelector("#about-modal").open) return;
+    if (compactLayout.matches && !controlPanel.classList.contains("is-collapsed")) {
+        setControlsOpen(false, true);
+    } else if (compactLayout.matches && legendPanel.classList.contains("is-expanded")) {
+        setLegendExpanded(false);
+        legendToggleButton.focus({ preventScroll: true });
+    } else if (activePopup.isOpen()) {
+        activePopup.remove();
+        map.getCanvas().focus({ preventScroll: true });
+    }
+});
+activePopup.on("open", () => {
+    if (!compactLayout.matches) return;
+    setControlsOpen(false);
+    setLegendExpanded(false);
+});
+compactLayout.addEventListener("change", syncResponsiveLayout);
+syncResponsiveLayout();
+// Opening the legend changes the map row's height without a window resize.
+new ResizeObserver(() => map.resize()).observe(map.getContainer());
 
-    panelLaunchButton.addEventListener("click", () => {
-        syncPanelState(false);
-    });
+// Safari's keyboard can cover the layout viewport without changing dvh.
+// Follow the visible height while leaving pinch zoom to the browser.
+if (window.visualViewport) {
+    const syncVisibleHeight = () => {
+        if (window.visualViewport.scale !== 1) return;
+        document.documentElement.style.setProperty("--viewport-height", `${window.visualViewport.height}px`);
+        if (compactLayout.matches && document.activeElement === searchInput) {
+            requestAnimationFrame(() => searchInput.scrollIntoView({ block: "nearest" }));
+        }
+    };
+    window.visualViewport.addEventListener("resize", syncVisibleHeight);
+    syncVisibleHeight();
+}
+
+function getDetailOffset() {
+    if (!compactLayout.matches) return [0, 120];
+    // Aim the glacier above its profile, in the remaining visible map area.
+    const profileHeight = activePopup.isOpen()
+        ? activePopup.getElement().getBoundingClientRect().height
+        : Math.min((window.visualViewport?.height ?? window.innerHeight) * 0.42, 340);
+    return [0, -profileHeight / 2];
 }
 
 // ---------------------------------------------------------------------------
@@ -1173,10 +1252,13 @@ async function bootstrap() {
 
     addGlacierSources();
     addGlacierLayers();
+    // Keep place names readable over glacier fills without changing hit testing.
+    map.moveLayer("basemap-labels");
     showTerrainHint();
 
     terrainButton.addEventListener("click", () => {
         terrainEnabled = !terrainEnabled;
+        terrainButton.setAttribute("aria-pressed", String(terrainEnabled));
         map.stop();
 
         if (terrainEnabled) {
@@ -1366,6 +1448,9 @@ async function bootstrap() {
     function exitBboxMode() {
         bboxActive = false;
         bboxZoomButton.classList.remove("is-active");
+        bboxZoomButton.setAttribute("aria-pressed", "false");
+        map.touchZoomRotate.enable();
+        mapCanvas.style.touchAction = "";
         mapCanvas.style.cursor = "";
         mapCanvasContainer.style.cursor = "";
         mapContainer.style.cursor = "";
@@ -1378,14 +1463,18 @@ async function bootstrap() {
         if (bboxActive) { exitBboxMode(); return; }
         bboxActive = true;
         bboxZoomButton.classList.add("is-active");
+        bboxZoomButton.setAttribute("aria-pressed", "true");
+        map.touchZoomRotate.disable();
         map.dragPan.disable();
+        mapCanvas.style.touchAction = "none";
         mapCanvas.style.cursor = "crosshair";
         mapCanvasContainer.style.cursor = "crosshair";
         mapContainer.style.cursor = "crosshair";
     });
 
-    mapContainer.addEventListener("mousedown", (e) => {
-        if (!bboxActive) return;
+    mapCanvas.addEventListener("pointerdown", (e) => {
+        if (!bboxActive || !e.isPrimary) return;
+        mapCanvas.setPointerCapture(e.pointerId);
         bboxStart = toContainerXY(e);
         bboxRect.hidden = false;
         bboxRect.style.left = bboxStart.x + "px";
@@ -1394,7 +1483,7 @@ async function bootstrap() {
         bboxRect.style.height = "0px";
     });
 
-    window.addEventListener("mousemove", (e) => {
+    mapCanvas.addEventListener("pointermove", (e) => {
         if (!bboxActive || !bboxStart) return;
         mapCanvas.style.cursor = "crosshair";
         mapCanvasContainer.style.cursor = "crosshair";
@@ -1410,8 +1499,9 @@ async function bootstrap() {
         bboxRect.style.height = h + "px";
     });
 
-    window.addEventListener("mouseup", (e) => {
+    mapCanvas.addEventListener("pointerup", (e) => {
         if (!bboxActive || !bboxStart) return;
+        if (mapCanvas.hasPointerCapture(e.pointerId)) mapCanvas.releasePointerCapture(e.pointerId);
         const end = toContainerXY(e);
         const x0 = Math.min(bboxStart.x, end.x);
         const y0 = Math.min(bboxStart.y, end.y);
@@ -1424,7 +1514,11 @@ async function bootstrap() {
         map.fitBounds([sw, ne], { padding: 20, maxZoom: 14 });
     });
 
-    initPanelToggle();
+    mapCanvas.addEventListener("pointercancel", exitBboxMode);
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && bboxActive) exitBboxMode();
+    });
+
     updateLegend();
     updateScenarioStats();
     initSearch();

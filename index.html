@@ -3,7 +3,8 @@
 
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
   <title>Global Glacier Extinction Explorer</title>
   <link rel="icon"
     href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏔️</text></svg>" />
@@ -48,18 +49,6 @@
 
         <div id="control-panel-body" class="control-panel-body">
           <section>
-            <h2>Explore</h2>
-            <p class="panel-copy">
-              Navigate the map to discover glaciers worldwide. Select a warming
-              scenario to see how projected extinction years shift under different
-              futures. Hover over a glacier for a quick summary, or click it to
-              explore its full profile — including area, elevation range, and
-              projected extinction timing across scenarios. Use the <strong>3D</strong>
-              button to tilt into a terrain view.
-            </p>
-          </section>
-
-          <section>
             <label for="scenario-select">Active scenario</label>
             <select id="scenario-select" aria-label="Select emissions scenario"></select>
             <p id="scenario-stats" class="microcopy"></p>
@@ -73,6 +62,14 @@
               <div id="search-results" class="search-results" hidden></div>
             </div>
             <p id="search-status" class="microcopy"></p>
+          </section>
+
+          <section>
+            <h2>Basemap</h2>
+            <label class="inline-toggle" for="basemap-labels-input">
+              <input id="basemap-labels-input" type="checkbox" />
+              <span>Show place names and boundaries</span>
+            </label>
           </section>
 
           <section>
@@ -91,31 +88,49 @@
             </label>
           </section>
 
+          <details class="explore-help">
+            <summary>How to explore</summary>
+            <p class="panel-copy">
+              Navigate the map to discover glaciers worldwide. Select a warming
+              scenario to see how projected extinction years shift under different
+              futures. Hover over a glacier for a quick summary, or click it to
+              explore its full profile — including area, elevation range, and
+              projected extinction timing across scenarios. Use the <strong>3D</strong>
+              button to tilt into a terrain view.
+            </p>
+          </details>
+
         </div>
       </aside>
     </div>
 
-    <aside class="legend-panel" id="legend-panel" aria-label="Legend">
-      <div class="legend-header">
-        <h2>Extinction year at: </h2>
-        <span id="active-scenario-chip" class="scenario-chip"></span>
-        <button id="legend-toggle-button" class="legend-toggle" type="button" aria-expanded="false"
-          title="Expand legend" hidden>
-          &#x25B2;
-        </button>
-      </div>
-      <div id="legend" class="legend"></div>
-      <p class="legend-attribution">
-        Tiles &copy; Esri, Maxar, Earthstar Geographics, and the GIS User Community |
-        Glacier data: <a href="https://doi.org/10.1038/s41558-025-02513-9" target="_blank" rel="noopener">Van Tricht et
-          al. (2026)</a>
-      </p>
-    </aside>
-
-    <button id="panel-launch-button" class="ghost-button compact-button" type="button" aria-controls="control-panel"
-      aria-label="Show controls" title="Show controls" hidden>
-      ☰
-    </button>
+    <div class="map-dock">
+      <button id="panel-launch-button" class="ghost-button compact-button" type="button" aria-controls="control-panel"
+        aria-label="Show controls" title="Show controls" hidden>
+        <span aria-hidden="true">☰</span><span class="panel-launch-label">Controls</span>
+      </button>
+      <aside class="legend-panel" id="legend-panel" aria-label="Legend">
+        <div class="legend-header">
+          <h2>Extinction year</h2>
+          <span id="active-scenario-chip" class="scenario-chip"></span>
+          <button id="legend-toggle-button" class="legend-toggle" type="button" aria-expanded="false"
+            title="Expand legend" aria-label="Expand legend" aria-controls="legend legend-attribution" hidden>
+            &#x25B2;
+          </button>
+        </div>
+        <div id="legend" class="legend"></div>
+        <p id="legend-attribution" class="legend-attribution">
+          Tiles &copy; Esri, Maxar, Earthstar Geographics, and the GIS User Community |
+          <span id="basemap-labels-attribution" hidden>Labels: Esri, HERE, Garmin,
+            &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap
+              contributors</a>,
+            and the GIS user community | </span>
+          Glacier data: <a href="https://doi.org/10.1038/s41558-025-02513-9" target="_blank" rel="noopener">Van Tricht
+            et
+            al. (2026)</a>
+        </p>
+      </aside>
+    </div>
 
     <!-- Hover tooltip: positioned near cursor by JS -->
     <div id="hover-tooltip" hidden aria-hidden="true"></div>
@@ -226,7 +241,7 @@
           The web application was designed and built by
           <a href="https://www.linkedin.com/in/kristofvantricht/" target="_blank" rel="noopener noreferrer">K. Van
             Tricht</a>,
-          with the assistance of Claude Sonnet 4.6 for the frontend code and data
+          with the assistance of Claude Sonnet 4.6 and GPT-6 Astra for the frontend code and data
           pipeline structure.
         </p>
 
