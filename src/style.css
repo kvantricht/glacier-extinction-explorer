@@ -39,6 +39,9 @@ body {
 
 #app-shell {
     position: relative;
+    /* Suppress Safari's page double-tap zoom, including on the absolute canvas.
+       Pinch zoom remains available on the app UI; MapLibre owns map gestures. */
+    touch-action: manipulation;
     height: 100vh;
     height: 100dvh;
     overflow: hidden;

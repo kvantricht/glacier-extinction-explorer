@@ -730,6 +730,25 @@ function wireHoverLayer(layerId, sourceId, sourceLayer, setHoverFn, clearHoverVa
 // ---------------------------------------------------------------------------
 
 let suppressMapClickUntil = 0;
+// Match MapLibre 4's double-tap interval. Opening a phone profile immediately
+// after the first tap can cover the canvas before the second tap lands.
+const TOUCH_SELECTION_DELAY_MS = 500;
+let pendingTouchSelection = null;
+let mapPointerType = "";
+
+function cancelPendingTouchSelection() {
+    clearTimeout(pendingTouchSelection);
+    pendingTouchSelection = null;
+}
+
+map.getCanvas().addEventListener("pointerdown", (event) => {
+    mapPointerType = event.pointerType;
+    cancelPendingTouchSelection();
+}, { passive: true });
+map.getCanvas().addEventListener("pointermove", (event) => {
+    mapPointerType = event.pointerType;
+}, { passive: true });
+map.on("movestart", cancelPendingTouchSelection);
 
 // Selection is independent of the camera. A small hit area helps with tiny
 // glaciers on touchscreens; panning, zooming and empty-map clicks keep it pinned.
@@ -743,10 +762,18 @@ map.on("click", (event) => {
     ], { layers });
     const feature = features[0];
     if (!feature) return;
-    map.stop();
-    popupOpenedByHover = false;
     const anchor = feature.geometry.type === "Point" ? feature.geometry.coordinates : event.lngLat;
-    showPopupAt(anchor, feature.properties);
+    const selectFeature = () => {
+        pendingTouchSelection = null;
+        if (!overlayVisible || document.querySelector("#about-modal").open) return;
+        popupOpenedByHover = false;
+        showPopupAt(anchor, feature.properties);
+    };
+    if (mapPointerType === "touch") {
+        pendingTouchSelection = setTimeout(selectFeature, TOUCH_SELECTION_DELAY_MS);
+    } else {
+        selectFeature();
+    }
 });
 
 // ---------------------------------------------------------------------------
@@ -962,6 +989,7 @@ function initSearch() {
 
 function zoomToSearchResult(item) {
     if (!Number.isFinite(item.lat) || !Number.isFinite(item.lon)) return;
+    cancelPendingTouchSelection();
     if (compactLayout.matches) setControlsOpen(false);
     setLegendExpanded(false);
     activePopup.remove();
@@ -1008,6 +1036,7 @@ function setLegendExpanded(expanded) {
 }
 
 function setControlsOpen(open, focus = false) {
+    if (open) cancelPendingTouchSelection();
     if (open && compactLayout.matches) {
         setLegendExpanded(false);
         activePopup.remove();
@@ -1042,6 +1071,7 @@ panelLaunchButton.addEventListener("click", () => {
     setControlsOpen(controlPanel.classList.contains("is-collapsed"), true);
 });
 legendToggleButton.addEventListener("click", () => {
+    cancelPendingTouchSelection();
     const expanded = !legendPanel.classList.contains("is-expanded");
     if (expanded && compactLayout.matches) {
         setControlsOpen(false);
@@ -1192,6 +1222,7 @@ async function bootstrap() {
     window.hoveredPolygonId = null;
 
     map.on("mousemove", "glaciers-points", (e) => {
+        if (mapPointerType === "touch") return;
         if (!overlayVisible || !e.features.length) return;
         if (bboxActive) return;
         map.getCanvas().style.cursor = "pointer";
@@ -1237,6 +1268,7 @@ async function bootstrap() {
     });
 
     map.on("mousemove", "glaciers-polygons-fill", (e) => {
+        if (mapPointerType === "touch") return;
         if (!overlayVisible || !e.features.length) return;
         if (bboxActive) return;
         map.getCanvas().style.cursor = "pointer";
