@@ -172,7 +172,7 @@ def make_tile_field_name(code: str, stat: str) -> str:
 
 # Default fallback path for pmtiles.exe on Windows when not on PATH
 _PMTILES_DEFAULT_PATHS = [
-    r"C:\Users\VTRICHTK\Downloads\pmtiles.exe",
+    r"C:\Users\vtrichtk\OneDrive - VITO\Documents\git\GlacierViz\scripts\pmtiles.exe",
 ]
 
 

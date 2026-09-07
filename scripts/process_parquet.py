@@ -13,15 +13,17 @@ def _is_numeric_name(value):
 
 
 def main():
-    orig_file = r"C:\Users\VTRICHTK\OneDrive - VITO\Documents\git\GlacierViz\data\global_glaciers_raw_selected_attributes.parquet"
-    orig_df = gpd.read_parquet(orig_file)
+    orig_file = r"C:\Users\vtrichtk\OneDrive - VITO\Documents\git\GlacierViz\data\global_glacier_extinction_dataset_07092026.gpkg"
+    orig_df = gpd.read_file(orig_file)
 
     cols = orig_df.columns
-    print(f"Columns in original Parquet file: {cols}")
+    print(f"Columns in original file: {cols}")
 
     print("Number of rows with missing 'Name':", orig_df["Name"].isna().sum())
 
-    orig_df.loc[orig_df["Name"] == "None", "Name"] = None
+    literal_none_mask = orig_df["Name"].eq("None")
+    print("Number of rows with literal 'None' name:", literal_none_mask.sum())
+    orig_df.loc[literal_none_mask, "Name"] = None
 
     replacements = {
         "�yenbreen": "Øyenbreen",
@@ -35,9 +37,13 @@ def main():
     print("Number of rows with numeric-only 'Name':", numeric_name_mask.sum())
     orig_df.loc[numeric_name_mask, "Name"] = None
 
+    missing_name_count = orig_df["Name"].isna().sum()
+    named_glacier_count = len(orig_df) - missing_name_count
+    named_glacier_percentage = 100 * named_glacier_count / len(orig_df)
+    print("Number of rows with missing 'Name' after cleaning:", missing_name_count)
     print(
-        "Number of rows with missing 'Name' after filling:",
-        orig_df["Name"].isna().sum(),
+        f"Glaciers with a usable name: {named_glacier_count:,} "
+        f"({named_glacier_percentage:.1f}%)"
     )
 
     orig_df = orig_df.drop(columns=["fid"], errors="ignore")
@@ -53,14 +59,15 @@ def main():
 
     # Process glacier volume
     def _process_volume(val):
-        if val is None or val == 0 or np.isnan(val):
+        numeric_value = pd.to_numeric(val, errors="coerce")
+        if pd.isna(numeric_value) or numeric_value == 0:
             return "Unknown"
-        elif val < 0.001:
+        elif numeric_value < 0.001:
             return (
-                str(round(val * 1e9)) + " m³"
+                str(round(numeric_value * 1e9)) + " m³"
             )  # convert km³ to m³ for very small glaciers
         else:
-            return str(round(val, 3)) + " km³"
+            return str(round(numeric_value, 3)) + " km³"
 
     orig_df["Glacier volume"] = orig_df["Volume"].apply(_process_volume)
     orig_df = orig_df.drop(columns=["Volume"])
