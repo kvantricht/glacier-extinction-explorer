@@ -21,10 +21,6 @@ def main():
 
     print("Number of rows with missing 'Name':", orig_df["Name"].isna().sum())
 
-    orig_df.loc[orig_df["Name"].isna(), "Name"] = orig_df.loc[
-        orig_df["Name"].isna(), "all_extinction_perglacier_volume_glacier_name"
-    ]
-
     orig_df.loc[orig_df["Name"] == "None", "Name"] = None
 
     replacements = {
@@ -44,10 +40,7 @@ def main():
         orig_df["Name"].isna().sum(),
     )
 
-    orig_df = orig_df.drop(
-        columns=["all_extinction_perglacier_volume_glacier_name", "fid"],
-        errors="ignore",
-    )
+    orig_df = orig_df.drop(columns=["fid"], errors="ignore")
 
     inventory_year = orig_df["BgnDate"].str[:4]
     inventory_year[inventory_year == "-999"] = "Unknown"
@@ -69,10 +62,8 @@ def main():
         else:
             return str(round(val, 3)) + " km³"
 
-    orig_df["Glacier volume"] = orig_df[
-        "all_extinction_perglacier_volume_ice_volume_km3"
-    ].apply(_process_volume)
-    orig_df = orig_df.drop(columns=["all_extinction_perglacier_volume_ice_volume_km3"])
+    orig_df["Glacier volume"] = orig_df["Volume"].apply(_process_volume)
+    orig_df = orig_df.drop(columns=["Volume"])
 
     orig_df.to_parquet(
         r"C:\Users\VTRICHTK\OneDrive - VITO\Documents\git\GlacierViz\data\global_glaciers_processed.parquet"
